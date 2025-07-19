@@ -1,12 +1,14 @@
 [package]
 name = "cleanmanager"
-version = "0.1.0"
-authors = ["Ivan Pasco Lizarraga"]
+version = "0.1.5"
+authors = ["Clean Language Team"]
 edition = "2021"
-description = "Version manager for Clean Language compiler"
+description = "A version manager for Clean Language compiler"
 license = "MIT"
 repository = "https://github.com/Ivan-Pasco/clean-language-manager"
-homepage = "https://www.cleanlanguage.dev"
+homepage = "https://github.com/Ivan-Pasco/clean-language-manager"
+keywords = ["clean", "language", "compiler", "version-manager"]
+categories = ["development-tools"]
 
 [[bin]]
 name = "cleanmanager"
