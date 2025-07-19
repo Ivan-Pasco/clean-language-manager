@@ -27,6 +27,11 @@ serde_json = "1.0"
 # File system
 dirs = "4.0"
 
+# Archive handling - older versions
+tar = "0.4.35"
+flate2 = "1.0.22"
+zip = "0.5.13"
+
 [dev-dependencies]
 tempfile = "3.8"
 pretty_assertions = "1.4"
