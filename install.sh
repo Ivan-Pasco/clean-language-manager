@@ -56,6 +56,70 @@ get_latest_version() {
         sed -E 's/.*"([^"]+)".*/\1/'
 }
 
+# Detect user's shell and config file
+detect_shell_config() {
+    local shell_name=$(basename "$SHELL")
+    
+    case "$shell_name" in
+        zsh)
+            echo "$HOME/.zshrc"
+            ;;
+        bash)
+            # Check which bash config file exists or should be used
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS: prefer .bash_profile
+                if [[ -f "$HOME/.bash_profile" ]]; then
+                    echo "$HOME/.bash_profile"
+                else
+                    echo "$HOME/.bash_profile"  # Create it if it doesn't exist
+                fi
+            else
+                # Linux: prefer .bashrc
+                if [[ -f "$HOME/.bashrc" ]]; then
+                    echo "$HOME/.bashrc"
+                else
+                    echo "$HOME/.bashrc"  # Create it if it doesn't exist
+                fi
+            fi
+            ;;
+        fish)
+            mkdir -p "$HOME/.config/fish"
+            echo "$HOME/.config/fish/config.fish"
+            ;;
+        *)
+            # Default to bashrc for unknown shells
+            echo "$HOME/.bashrc"
+            ;;
+    esac
+}
+
+# Add directory to PATH in shell config
+add_to_path() {
+    local config_file="$1"
+    local path_export="export PATH=\"$INSTALL_DIR:\$PATH\""
+    
+    # Check if the PATH export already exists
+    if [[ -f "$config_file" ]] && grep -q "PATH.*$INSTALL_DIR" "$config_file"; then
+        echo -e "${YELLOW}⚠️  PATH already configured in $config_file${NC}"
+        return 0
+    fi
+    
+    echo -e "${YELLOW}Adding $INSTALL_DIR to PATH in $config_file${NC}"
+    
+    # Create config file if it doesn't exist
+    touch "$config_file"
+    
+    # Add a comment and the PATH export
+    {
+        echo ""
+        echo "# Added by Clean Language Manager installer"
+        echo "$path_export"
+    } >> "$config_file"
+    
+    echo -e "${GREEN}✅ PATH updated in $config_file${NC}"
+    return 0
+}
+
 # Download and extract binary
 install_cleanmanager() {
     local platform=$(detect_platform)
@@ -131,21 +195,39 @@ install_cleanmanager() {
     
     # Check if install directory is in PATH
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        echo -e "${YELLOW}⚠️  Installation directory is not in your PATH${NC}"
+        echo -e "${YELLOW}⚠️  Setting up PATH configuration...${NC}"
         echo
-        echo "Add the following line to your shell configuration file:"
-        echo -e "  ${BLUE}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
+        
+        # Detect shell config file
+        local config_file=$(detect_shell_config)
+        local shell_name=$(basename "$SHELL")
+        
+        echo -e "Detected shell: ${BLUE}$shell_name${NC}"
+        echo -e "Config file: ${BLUE}$config_file${NC}"
         echo
-        echo "Shell configuration files:"
-        echo "  - Bash: ~/.bashrc or ~/.bash_profile"
-        echo "  - Zsh: ~/.zshrc"
-        echo "  - Fish: ~/.config/fish/config.fish"
-        echo
-        echo "Then restart your terminal or run:"
-        echo -e "  ${BLUE}source ~/.bashrc${NC}  # or your shell config file"
-        echo
-        echo "Alternatively, run cleanmanager directly:"
-        echo -e "  ${BLUE}$INSTALL_DIR/cleanmanager --help${NC}"
+        
+        # Add to PATH
+        if add_to_path "$config_file"; then
+            echo
+            echo -e "${GREEN}✅ PATH configured successfully!${NC}"
+            echo
+            echo -e "${YELLOW}To use cleanmanager immediately, run:${NC}"
+            echo -e "  ${BLUE}source $config_file${NC}"
+            echo -e "${YELLOW}Or restart your terminal${NC}"
+            echo
+            echo -e "${YELLOW}You can also run cleanmanager directly:${NC}"
+            echo -e "  ${BLUE}$INSTALL_DIR/cleanmanager --help${NC}"
+        else
+            echo -e "${RED}Failed to configure PATH automatically${NC}"
+            echo
+            echo "Please add the following line to your shell configuration file:"
+            echo -e "  ${BLUE}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
+            echo
+            echo "Shell configuration files:"
+            echo "  - Bash: ~/.bashrc or ~/.bash_profile"
+            echo "  - Zsh: ~/.zshrc" 
+            echo "  - Fish: ~/.config/fish/config.fish"
+        fi
     else
         echo -e "${GREEN}✅ Installation directory is already in your PATH${NC}"
         echo
@@ -155,11 +237,11 @@ install_cleanmanager() {
     
     echo
     echo -e "${BLUE}Next steps:${NC}"
-    echo "1. Run: cleanmanager init"
-    echo "2. Run: cleanmanager doctor"
-    echo "3. Install a Clean Language version: cleanmanager install <version>"
+    echo "1. Run: ${BLUE}cleanmanager init${NC}"
+    echo "2. Run: ${BLUE}cleanmanager doctor${NC}"
+    echo "3. Install a Clean Language version: ${BLUE}cleanmanager install <version>${NC}"
     echo
-    echo "For more information: https://github.com/$REPO"
+    echo "For more information: ${BLUE}https://github.com/$REPO${NC}"
 }
 
 # Main execution

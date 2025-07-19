@@ -26,6 +26,37 @@ function Get-LatestVersion {
     }
 }
 
+# Function to add directory to PATH
+function Add-ToPath {
+    param([string]$Directory)
+    
+    try {
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        
+        # Check if already in PATH
+        if ($currentPath -like "*$Directory*") {
+            Write-Host "⚠️  PATH already configured" -ForegroundColor Yellow
+            return $true
+        }
+        
+        Write-Host "Adding $Directory to PATH..." -ForegroundColor Yellow
+        
+        # Add to user PATH
+        $newPath = if ($currentPath) { "$currentPath;$Directory" } else { $Directory }
+        [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+        
+        # Update current session PATH
+        $env:PATH = "$env:PATH;$Directory"
+        
+        Write-Host "✅ PATH updated successfully!" -ForegroundColor Green
+        return $true
+    }
+    catch {
+        Write-Host "❌ Failed to update PATH: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
 # Function to download and extract
 function Install-CleanManager {
     $version = Get-LatestVersion
@@ -67,18 +98,34 @@ function Install-CleanManager {
         Write-Host "✅ Clean Language Manager installed successfully!" -ForegroundColor Green
         Write-Host ""
         
-        # Check if install directory is in PATH
+        # Check and configure PATH
         $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
         if ($currentPath -notlike "*$InstallDir*") {
-            Write-Host "⚠️  Installation directory is not in your PATH" -ForegroundColor Yellow
+            Write-Host "⚠️  Setting up PATH configuration..." -ForegroundColor Yellow
             Write-Host ""
-            Write-Host "To add cleanmanager to your PATH:"
-            Write-Host "1. Open PowerShell as Administrator"
-            Write-Host "2. Run: [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$InstallDir', 'User')" -ForegroundColor Blue
-            Write-Host "3. Restart your terminal"
-            Write-Host ""
-            Write-Host "Alternatively, run cleanmanager directly:"
-            Write-Host "  $InstallDir\cleanmanager.exe --help" -ForegroundColor Blue
+            
+            if (Add-ToPath -Directory $InstallDir) {
+                Write-Host ""
+                Write-Host "✅ PATH configured successfully!" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "To use cleanmanager immediately:" -ForegroundColor Yellow
+                Write-Host "  - Restart your PowerShell/Terminal" -ForegroundColor Blue
+                Write-Host "  - Or run: refreshenv (if you have Chocolatey)" -ForegroundColor Blue
+                Write-Host ""
+                Write-Host "You can also run cleanmanager directly:" -ForegroundColor Yellow
+                Write-Host "  $InstallDir\cleanmanager.exe --help" -ForegroundColor Blue
+            }
+            else {
+                Write-Host "Failed to configure PATH automatically" -ForegroundColor Red
+                Write-Host ""
+                Write-Host "To add cleanmanager to your PATH manually:"
+                Write-Host "1. Open PowerShell as Administrator"
+                Write-Host "2. Run: [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$InstallDir', 'User')" -ForegroundColor Blue
+                Write-Host "3. Restart your terminal"
+                Write-Host ""
+                Write-Host "Alternatively, run cleanmanager directly:"
+                Write-Host "  $InstallDir\cleanmanager.exe --help" -ForegroundColor Blue
+            }
         }
         else {
             Write-Host "✅ Installation directory is already in your PATH" -ForegroundColor Green
@@ -89,11 +136,11 @@ function Install-CleanManager {
         
         Write-Host ""
         Write-Host "Next steps:" -ForegroundColor Blue
-        Write-Host "1. Run: cleanmanager init"
-        Write-Host "2. Run: cleanmanager doctor"
-        Write-Host "3. Install a Clean Language version: cleanmanager install <version>"
+        Write-Host "1. Run: " -NoNewline; Write-Host "cleanmanager init" -ForegroundColor Blue
+        Write-Host "2. Run: " -NoNewline; Write-Host "cleanmanager doctor" -ForegroundColor Blue
+        Write-Host "3. Install a Clean Language version: " -NoNewline; Write-Host "cleanmanager install <version>" -ForegroundColor Blue
         Write-Host ""
-        Write-Host "For more information: https://github.com/$Repo"
+        Write-Host "For more information: " -NoNewline; Write-Host "https://github.com/$Repo" -ForegroundColor Blue
     }
     finally {
         # Cleanup
