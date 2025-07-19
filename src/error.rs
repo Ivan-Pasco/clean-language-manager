@@ -51,6 +51,14 @@ pub enum CleanManagerError {
     EnvironmentError { message: String },
 }
 
+impl From<anyhow::Error> for CleanManagerError {
+    fn from(error: anyhow::Error) -> Self {
+        CleanManagerError::ShellError {
+            message: error.to_string(),
+        }
+    }
+}
+
 impl CleanManagerError {
     pub fn config_error<S: Into<String>>(message: S) -> Self {
         CleanManagerError::ConfigError {
