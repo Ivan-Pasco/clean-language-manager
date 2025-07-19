@@ -22,9 +22,11 @@ jobs:
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
 
     - name: Cache Cargo dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -33,6 +35,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Check formatting
+      if: matrix.os == 'ubuntu-latest'  # Only run on one OS to avoid redundancy
       run: cargo fmt --all -- --check
 
     - name: Run Clippy

@@ -54,7 +54,7 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Cache Cargo dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -77,12 +77,13 @@ jobs:
 
     - name: Create archive (Windows)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
         cd target/${{ matrix.target }}/release
-        7z a ../../../${{ matrix.archive_name }} ${{ matrix.binary_name }}
+        Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ../../../${{ matrix.archive_name }}
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.archive_name }}
         path: ${{ matrix.archive_name }}
@@ -91,24 +92,31 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
     
     - name: Display structure of downloaded files
-      run: ls -la
+      run: find artifacts -type f
+    
+    - name: Move artifacts to root
+      run: |
+        find artifacts -name "*.tar.gz" -exec mv {} . \;
+        find artifacts -name "*.zip" -exec mv {} . \;
     
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Clean Language Manager ${{ github.ref }}
+        tag_name: ${{ github.ref_name }}
+        name: Clean Language Manager ${{ github.ref_name }}
         body: |
           ## Clean Language Manager Release
           
@@ -116,7 +124,11 @@ jobs:
           
           #### Quick Install (Recommended)
           ```bash
+          # Unix/Linux/macOS
           curl -sSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | bash
+          
+          # Windows PowerShell
+          iwr https://github.com/${{ github.repository }}/releases/latest/download/install.ps1 | iex
           ```
           
           #### Manual Installation
@@ -141,65 +153,12 @@ jobs:
           ```
           
           For more information, see the [README](https://github.com/${{ github.repository }}/blob/main/README.md).
+        files: |
+          *.tar.gz
+          *.zip
+          install.sh
+          install.ps1
         draft: false
         prerelease: false
-    
-    - name: Upload Linux release asset
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./cleanmanager-linux-x86_64.tar.gz/cleanmanager-linux-x86_64.tar.gz
-        asset_name: cleanmanager-linux-x86_64.tar.gz
-        asset_content_type: application/gzip
-    
-    - name: Upload macOS Intel release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./cleanmanager-macos-x86_64.tar.gz/cleanmanager-macos-x86_64.tar.gz
-        asset_name: cleanmanager-macos-x86_64.tar.gz
-        asset_content_type: application/gzip
-    
-    - name: Upload macOS ARM release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./cleanmanager-macos-aarch64.tar.gz/cleanmanager-macos-aarch64.tar.gz
-        asset_name: cleanmanager-macos-aarch64.tar.gz
-        asset_content_type: application/gzip
-    
-    - name: Upload Windows release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./cleanmanager-windows-x86_64.zip/cleanmanager-windows-x86_64.zip
-        asset_name: cleanmanager-windows-x86_64.zip
-        asset_content_type: application/zip
-    
-    - name: Upload install script (Unix)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./install.sh
-        asset_name: install.sh
-        asset_content_type: text/plain
-    
-    - name: Upload install script (Windows)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./install.ps1
-        asset_name: install.ps1
-        asset_content_type: text/plain
