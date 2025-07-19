@@ -1,18 +1,83 @@
 # Clean Language Manager
 
-A Rust-based version manager for the Clean Language compiler (`cln`). Allows developers to easily install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems.
+A cross-platform version manager for the Clean Language compiler, similar to rustup for Rust or nvm for Node.js.
 
-## Status
+## ⚡ Quick Start
 
-✅ **Ready for Use** - Full version management functionality implemented with automated releases.
+### One-Line Installation
+
+**Unix/Linux/macOS:**
+```bash
+curl -sSL https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/download/install.sh | bash
+```
+
+**Windows PowerShell:**
+```powershell
+iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/download/install.ps1 | iex
+```
+
+### 🚀 **NEW: Fully Automated Setup**
+```bash
+# Automatic shell detection and PATH configuration
+cleanmanager init
+
+# 🔧 Initializing Clean Language Manager
+# 
+# 📁 Clean Language Manager directories:
+#   - Manager directory: "/Users/you/.cleanmanager"
+#   - Binary directory: "/Users/you/.cleanmanager/bin"
+#   - Versions directory: "/Users/you/.cleanmanager/versions"
+#
+# 🛣️  Configuring PATH for Clean Language Manager
+#
+# Detected shell: zsh
+# Configuration file: /Users/you/.zshrc
+#
+# Would you like to automatically add Clean Language Manager to your PATH? (Y/n): 
+# ✅ Successfully configured PATH!
+#
+# 🔄 To apply the changes:
+#   1. Restart your terminal, OR
+#   2. Run: source /Users/you/.zshrc
+#
+# Then run 'cleanmanager doctor' to verify your setup.
+```
+
+### Complete Setup
+```bash
+# Verify everything works
+cleanmanager doctor
+
+# List available Clean Language versions from GitHub
+cleanmanager available
+
+# Install and use a version
+cleanmanager install 0.1.2
+cleanmanager use 0.1.2
+
+# Now `cln` command is available!
+cln --version
+```
 
 ## Features
 
-- **Version Management**: Install and manage multiple Clean Language compiler versions
-- **Easy Switching**: Switch between versions with simple commands
+### 🚀 **Automated Experience**
+- **One-Line Installation**: Fully automated installation with PATH configuration
+- **Interactive Setup**: Smart shell detection with automatic config file updates (`cleanmanager init`)
+- **Zero Configuration**: Works out-of-the-box with sensible defaults
+- **Professional UX**: Clear guidance, error recovery, and helpful feedback
+
+### ⚙️ **Version Management**
+- **Multi-version Support**: Install and manage multiple Clean Language compiler versions
+- **Easy Switching**: Switch between versions with simple commands (`cleanmanager use <version>`)
+- **GitHub Integration**: Direct access to official Clean Language releases (`cleanmanager available`)
+- **Isolated Installations**: Each version stored separately with automatic routing
+
+### 🔧 **Platform & Shell Support**
 - **Cross-Platform**: Native support for macOS (Intel & Apple Silicon), Linux, and Windows
-- **Shell Integration**: Automatic PATH configuration and environment setup
-- **Environment Diagnostics**: Built-in health checking and troubleshooting
+- **Shell Integration**: Supports bash, zsh, and fish with proper syntax and PATH management
+- **Environment Diagnostics**: Built-in health checking and troubleshooting (`cleanmanager doctor`)
+- **Smart Error Handling**: Helpful error messages with recovery suggestions
 
 ## Installation
 
