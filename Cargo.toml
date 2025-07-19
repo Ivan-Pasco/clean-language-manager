@@ -1,0 +1,32 @@
+[package]
+name = "cleanmanager"
+version = "0.1.0"
+authors = ["Ivan Pasco Lizarraga"]
+edition = "2021"
+description = "Version manager for Clean Language compiler"
+license = "MIT"
+repository = "https://github.com/Ivan-Pasco/clean-language-manager"
+homepage = "https://www.cleanlanguage.dev"
+
+[[bin]]
+name = "cleanmanager"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "3.2", features = ["derive"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# File system
+dirs = "4.0"
+
+[dev-dependencies]
+tempfile = "3.8"
+pretty_assertions = "1.4"
