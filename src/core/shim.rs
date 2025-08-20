@@ -91,6 +91,7 @@ impl ShimManager {
     }
 
     #[cfg(windows)]
+    #[allow(dead_code)]
     fn resolve_link(&self, _link: &Path) -> Result<std::path::PathBuf> {
         // On Windows, we can't easily resolve what was copied
         // Return the link path itself
