@@ -16,27 +16,25 @@ pub fn sync_project_version() -> Result<()> {
         .and_then(|name| name.to_str())
         .unwrap_or("current project");
 
-    println!("📁 Project: {}", project_name);
-    println!("   Directory: {:?}", current_dir);
+    println!("📁 Project: {project_name}");
+    println!("   Directory: {current_dir:?}");
 
     // Look for .cleanlanguage/.cleanversion file
     match config.get_project_version() {
         Some(project_version) => {
             println!(
-                "📋 Found .cleanlanguage/.cleanversion file specifying: {}",
-                project_version
+                "📋 Found .cleanlanguage/.cleanversion file specifying: {project_version}"
             );
 
             // Check if version is already installed
             if version_manager.is_version_installed(&project_version) {
-                println!("✅ Version {} is already installed", project_version);
+                println!("✅ Version {project_version} is already installed");
                 println!();
                 println!("🎉 Project is ready to use!");
                 println!("   Run 'cln --version' to verify");
             } else {
                 println!(
-                    "📦 Version {} is not installed, installing now...",
-                    project_version
+                    "📦 Version {project_version} is not installed, installing now..."
                 );
                 println!();
 
@@ -46,8 +44,7 @@ pub fn sync_project_version() -> Result<()> {
                         println!();
                         println!("🎉 Successfully synced project version!");
                         println!(
-                            "   Project {} is now ready to use Clean Language v{}",
-                            project_name, project_version
+                            "   Project {project_name} is now ready to use Clean Language v{project_version}"
                         );
                         println!();
                         println!("🔍 Verify with:");
@@ -55,13 +52,12 @@ pub fn sync_project_version() -> Result<()> {
                         println!("  cln --version");
                     }
                     Err(e) => {
-                        println!("❌ Failed to install version {}: {}", project_version, e);
+                        println!("❌ Failed to install version {project_version}: {e}");
                         println!();
                         println!("💡 You can try:");
                         println!("  cleanmanager available    # Check available versions");
                         println!(
-                            "  cleanmanager install {}   # Install manually",
-                            project_version
+                            "  cleanmanager install {project_version}   # Install manually"
                         );
                         return Err(e);
                     }

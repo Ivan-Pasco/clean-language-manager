@@ -3,7 +3,7 @@ use crate::error::{CleanManagerError, Result};
 use std::path::Path;
 
 pub fn install_version(version: &str) -> Result<()> {
-    println!("Installing Clean Language version: {}", version);
+    println!("Installing Clean Language version: {version}");
 
     let config = Config::load()?;
     let github_client = GitHubClient::new(config.github_api_token.clone());
@@ -26,7 +26,7 @@ pub fn install_version(version: &str) -> Result<()> {
                 release.tag_name
             }
             Err(e) => {
-                println!("⚠️  Unable to fetch latest version from GitHub: {}", e);
+                println!("⚠️  Unable to fetch latest version from GitHub: {e}");
                 println!("   This may be because the repository doesn't have releases yet.");
                 println!("   Please specify a specific version or check the repository:");
                 println!("   https://github.com/Ivan-Pasco/clean-language-compiler/releases");
@@ -37,14 +37,14 @@ pub fn install_version(version: &str) -> Result<()> {
         version.to_string()
     };
 
-    println!("Resolved version: {}", actual_version);
+    println!("Resolved version: {actual_version}");
 
     // Get releases and find the specified version
     println!("Fetching available releases...");
     let releases = match github_client.get_releases("Ivan-Pasco", "clean-language-compiler") {
         Ok(releases) => releases,
         Err(e) => {
-            println!("⚠️  Unable to fetch releases from GitHub: {}", e);
+            println!("⚠️  Unable to fetch releases from GitHub: {e}");
             println!("   This may be because:");
             println!("   • The repository doesn't have releases yet");
             println!("   • Network connectivity issues");
@@ -79,7 +79,7 @@ pub fn install_version(version: &str) -> Result<()> {
 
     // Find appropriate asset for current platform
     let platform_suffix = get_platform_suffix();
-    println!("Looking for asset matching platform: {}", platform_suffix);
+    println!("Looking for asset matching platform: {platform_suffix}");
 
     let asset = release
         .assets
@@ -107,8 +107,7 @@ pub fn install_version(version: &str) -> Result<()> {
             }
             CleanManagerError::BinaryNotFound {
                 name: format!(
-                    "Asset for platform {} (or universal binary)",
-                    platform_suffix
+                    "Asset for platform {platform_suffix} (or universal binary)"
                 ),
             }
         })?;
@@ -116,7 +115,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("Found asset: {}", asset.name);
 
     // Create temporary download directory
-    let temp_dir = std::env::temp_dir().join(format!("cleanmanager-{}", actual_version));
+    let temp_dir = std::env::temp_dir().join(format!("cleanmanager-{actual_version}"));
     std::fs::create_dir_all(&temp_dir)?;
 
     // Download the asset
@@ -163,7 +162,7 @@ pub fn install_version(version: &str) -> Result<()> {
     print!("🔍 Validating installation...");
     if let Err(e) = validate_installed_binary(&binary_path) {
         println!();
-        eprintln!("⚠️  Warning: Installed binary may have issues: {}", e);
+        eprintln!("⚠️  Warning: Installed binary may have issues: {e}");
         eprintln!("   The binary was installed but may not function correctly.");
         eprintln!("   You may need to use a different version or compile from source.");
     } else {
@@ -171,13 +170,12 @@ pub fn install_version(version: &str) -> Result<()> {
     }
 
     println!(
-        "✅ Successfully installed Clean Language version {}",
-        actual_version
+        "✅ Successfully installed Clean Language version {actual_version}"
     );
-    println!("   Binary location: {:?}", binary_path);
+    println!("   Binary location: {binary_path:?}");
     println!();
     println!("To use this version, run:");
-    println!("   cleanmanager use {}", actual_version);
+    println!("   cleanmanager use {actual_version}");
 
     Ok(())
 }
@@ -191,7 +189,7 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
     }
 
     // Test 2: Check if binary can show version (basic execution test)
-    let version_output = Command::new(binary_path).args(&["version"]).output();
+    let version_output = Command::new(binary_path).args(["version"]).output();
 
     match version_output {
         Ok(output) => {
@@ -208,7 +206,7 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
             }
         }
         Err(e) => {
-            return Err(format!("Failed to execute binary: {}", e));
+            return Err(format!("Failed to execute binary: {e}"));
         }
     }
 
@@ -223,12 +221,12 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
 
     // Write test program
     if let Err(e) = std::fs::write(&test_file, test_program) {
-        return Err(format!("Failed to create test file: {}", e));
+        return Err(format!("Failed to create test file: {e}"));
     }
 
     // Try to compile
     let compile_result = Command::new(binary_path)
-        .args(&[
+        .args([
             "compile",
             test_file.to_str().unwrap(),
             test_wasm.to_str().unwrap(),
@@ -243,11 +241,11 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
         Ok(output) => {
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Compilation test failed: {}", stderr));
+                return Err(format!("Compilation test failed: {stderr}"));
             }
         }
         Err(e) => {
-            return Err(format!("Failed to run compilation test: {}", e));
+            return Err(format!("Failed to run compilation test: {e}"));
         }
     }
 
@@ -273,7 +271,7 @@ fn get_platform_suffix() -> String {
         "unknown"
     };
 
-    format!("{}-{}", os, arch)
+    format!("{os}-{arch}")
 }
 
 fn find_binary_in_dir(dir: &Path) -> Result<std::path::PathBuf> {
@@ -301,6 +299,5 @@ fn find_binary_in_dir(dir: &Path) -> Result<std::path::PathBuf> {
 
     Err(CleanManagerError::BinaryNotFound {
         name: binary_name.to_string(),
-    }
-    .into())
+    })
 }

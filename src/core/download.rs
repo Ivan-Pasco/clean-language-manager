@@ -13,7 +13,7 @@ impl Downloader {
     }
 
     pub fn download_file(&self, url: &str, destination: &Path) -> Result<()> {
-        println!("Downloading from {}...", url);
+        println!("Downloading from {url}...");
 
         // Ensure parent directory exists
         if let Some(parent) = destination.parent() {
@@ -37,12 +37,12 @@ impl Downloader {
             ));
         }
 
-        println!("Downloaded to {:?}", destination);
+        println!("Downloaded to {destination:?}");
         Ok(())
     }
 
     pub fn extract_archive(&self, archive_path: &Path, destination: &Path) -> Result<()> {
-        println!("Extracting {:?} to {:?}", archive_path, destination);
+        println!("Extracting {archive_path:?} to {destination:?}");
 
         std::fs::create_dir_all(destination)?;
 

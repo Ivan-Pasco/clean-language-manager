@@ -13,7 +13,7 @@ pub fn init_shell() -> Result<()> {
 
     println!("📁 Clean Language Manager directories:");
     println!("  - Manager directory: {:?}", config.cleanmanager_dir);
-    println!("  - Binary directory: {:?}", bin_dir);
+    println!("  - Binary directory: {bin_dir:?}");
     println!("  - Versions directory: {:?}", config.get_versions_dir());
     println!();
 
@@ -32,7 +32,7 @@ pub fn init_shell() -> Result<()> {
     let shell_name = shell::detect_shell();
     let config_path = shell::get_shell_config_path()?;
 
-    println!("Detected shell: {}", shell_name);
+    println!("Detected shell: {shell_name}");
     println!("Configuration file: {}", config_path.display());
     println!();
 
@@ -58,7 +58,7 @@ pub fn init_shell() -> Result<()> {
                 println!("Then run 'cleanmanager doctor' to verify your setup.");
             }
             Err(e) => {
-                println!("❌ Automatic configuration failed: {}", e);
+                println!("❌ Automatic configuration failed: {e}");
                 println!();
                 show_manual_instructions(
                     &bin_dir_str,
@@ -86,13 +86,13 @@ fn show_manual_instructions(bin_dir: &str, shell: &str, config_file: &str) {
     println!();
 
     let export_line = match shell {
-        "fish" => format!("set -gx PATH \"{}\" $PATH", bin_dir),
-        _ => format!("export PATH=\"{}:$PATH\"", bin_dir),
+        "fish" => format!("set -gx PATH \"{bin_dir}\" $PATH"),
+        _ => format!("export PATH=\"{bin_dir}:$PATH\""),
     };
 
-    println!("  {}", export_line);
+    println!("  {export_line}");
     println!();
-    println!("Configuration file: {}", config_file);
+    println!("Configuration file: {config_file}");
     println!();
     println!("📝 Steps:");
     println!("  1. Add the export line above to your shell config file");
@@ -104,5 +104,5 @@ fn show_manual_instructions(bin_dir: &str, shell: &str, config_file: &str) {
     println!("  4. Install a Clean Language version: cleanmanager install <version>");
     println!();
     println!("💡 Tip: You can also temporarily add to PATH by running:");
-    println!("  {}", export_line);
+    println!("  {export_line}");
 }

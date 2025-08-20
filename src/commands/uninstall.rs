@@ -3,7 +3,7 @@ use crate::error::{CleanManagerError, Result};
 use std::io::{self, Write};
 
 pub fn uninstall_version(version: &str) -> Result<()> {
-    println!("Uninstalling Clean Language version: {}", version);
+    println!("Uninstalling Clean Language version: {version}");
 
     let mut config = Config::load()?;
     let version_dir = config.get_version_dir(version);
@@ -18,7 +18,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
     // Check if this is the currently active version
     if let Some(ref active_version) = config.active_version {
         if active_version == version {
-            println!("⚠️  Version {} is currently active.", version);
+            println!("⚠️  Version {version} is currently active.");
             print!("Do you want to continue uninstalling it? [y/N]: ");
             io::stdout().flush()?;
 
@@ -38,8 +38,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
 
     // Confirm uninstallation
     print!(
-        "Are you sure you want to uninstall version {}? [y/N]: ",
-        version
+        "Are you sure you want to uninstall version {version}? [y/N]: "
     );
     io::stdout().flush()?;
 
@@ -52,12 +51,11 @@ pub fn uninstall_version(version: &str) -> Result<()> {
     }
 
     // Remove the version directory
-    println!("Removing version directory: {:?}", version_dir);
+    println!("Removing version directory: {version_dir:?}");
     std::fs::remove_dir_all(&version_dir)?;
 
     println!(
-        "✅ Successfully uninstalled Clean Language version {}",
-        version
+        "✅ Successfully uninstalled Clean Language version {version}"
     );
 
     // Show remaining versions if any
@@ -80,7 +78,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
         } else {
             println!("\nRemaining installed versions:");
             for v in remaining_versions {
-                println!("  • {}", v);
+                println!("  • {v}");
             }
         }
     }

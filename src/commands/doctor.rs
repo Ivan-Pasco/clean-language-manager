@@ -16,7 +16,7 @@ pub fn check_environment() -> Result<()> {
     // Check cleanmanager directories
     println!("📁 Directory Structure:");
     let cleanmanager_dir = &config.cleanmanager_dir;
-    println!("  cleanmanager directory: {:?}", cleanmanager_dir);
+    println!("  cleanmanager directory: {cleanmanager_dir:?}");
 
     if cleanmanager_dir.exists() {
         println!("    ✅ exists");
@@ -26,7 +26,7 @@ pub fn check_environment() -> Result<()> {
     }
 
     let versions_dir = config.get_versions_dir();
-    println!("  versions directory: {:?}", versions_dir);
+    println!("  versions directory: {versions_dir:?}");
     if versions_dir.exists() {
         println!("    ✅ exists");
     } else {
@@ -35,7 +35,7 @@ pub fn check_environment() -> Result<()> {
     }
 
     let bin_dir = config.get_bin_dir();
-    println!("  bin directory: {:?}", bin_dir);
+    println!("  bin directory: {bin_dir:?}");
     if bin_dir.exists() {
         println!("    ✅ exists");
     } else {
@@ -71,13 +71,12 @@ pub fn check_environment() -> Result<()> {
 
     // Show current directory
     if let Ok(current_dir) = env::current_dir() {
-        println!("  Current directory: {:?}", current_dir);
+        println!("  Current directory: {current_dir:?}");
 
         // Check for project version
         if let Some(project_version) = config.get_project_version() {
             println!(
-                "  📁 Project version (.cleanlanguage/.cleanversion): {}",
-                project_version
+                "  📁 Project version (.cleanlanguage/.cleanversion): {project_version}"
             );
 
             // Verify project version is installed
@@ -85,8 +84,7 @@ pub fn check_environment() -> Result<()> {
                 println!("    ✅ Project version is installed");
             } else {
                 println!(
-                    "    ❌ Project version not installed - run 'cleanmanager install {}'",
-                    project_version
+                    "    ❌ Project version not installed - run 'cleanmanager install {project_version}'"
                 );
                 issues_found += 1;
             }
@@ -97,7 +95,7 @@ pub fn check_environment() -> Result<()> {
 
     // Show global active version
     if let Some(ref global_version) = config.active_version {
-        println!("  🌐 Global version: {}", global_version);
+        println!("  🌐 Global version: {global_version}");
     } else {
         println!("  🌐 Global version: none");
     }
@@ -105,15 +103,14 @@ pub fn check_environment() -> Result<()> {
     // Show effective version
     if let Some(effective_version) = config.get_effective_version() {
         println!(
-            "  ⚙️  Effective version (what 'cln' will use): {}",
-            effective_version
+            "  ⚙️  Effective version (what 'cln' will use): {effective_version}"
         );
 
         let binary_path = config.get_version_binary(&effective_version);
         if binary_path.exists() {
-            println!("    ✅ Binary exists: {:?}", binary_path);
+            println!("    ✅ Binary exists: {binary_path:?}");
         } else {
-            println!("    ❌ Binary missing: {:?}", binary_path);
+            println!("    ❌ Binary missing: {binary_path:?}");
             issues_found += 1;
         }
     } else {
@@ -127,7 +124,7 @@ pub fn check_environment() -> Result<()> {
     // Check shim
     println!("🔗 Shim Status:");
     let shim_path = config.get_shim_path();
-    println!("  Shim path: {:?}", shim_path);
+    println!("  Shim path: {shim_path:?}");
 
     if shim_path.exists() {
         println!("    ✅ Shim exists");
@@ -170,7 +167,7 @@ pub fn check_environment() -> Result<()> {
                         println!("    ✅ Runtime test passed");
                     }
                     Err(e) => {
-                        println!("    ❌ Runtime test failed: {}", e);
+                        println!("    ❌ Runtime test failed: {e}");
                         println!("      This indicates WebAssembly runtime issues");
                         issues_found += 1;
                     }
@@ -207,7 +204,7 @@ pub fn check_environment() -> Result<()> {
             println!("  - This creates a .cleanlanguage/.cleanversion file for the project");
         }
     } else {
-        println!("⚠️  Found {} issue(s) that need attention.", issues_found);
+        println!("⚠️  Found {issues_found} issue(s) that need attention.");
         println!();
         println!("💡 To fix issues:");
         println!("  - Run 'cleanmanager init' to set up shell configuration");
@@ -230,12 +227,12 @@ fn test_runtime_execution() -> Result<()> {
 
     // Write test program
     std::fs::write(&test_file, test_program).map_err(|e| CleanManagerError::ValidationError {
-        message: format!("Failed to create test file: {}", e),
+        message: format!("Failed to create test file: {e}"),
     })?;
 
     // Try to run the program
     let run_result = Command::new("cln")
-        .args(&["run", test_file.to_str().unwrap()])
+        .args(["run", test_file.to_str().unwrap()])
         .output();
 
     // Clean up test file
@@ -265,13 +262,13 @@ fn test_runtime_execution() -> Result<()> {
                     })
                 } else {
                     Err(CleanManagerError::ValidationError {
-                        message: format!("Runtime execution failed: {}", stderr),
+                        message: format!("Runtime execution failed: {stderr}"),
                     })
                 }
             }
         }
         Err(e) => Err(CleanManagerError::ValidationError {
-            message: format!("Failed to execute runtime test: {}", e),
+            message: format!("Failed to execute runtime test: {e}"),
         }),
     }
 }

@@ -149,13 +149,12 @@ impl Config {
         // Create .cleanlanguage directory if it doesn't exist
         std::fs::create_dir_all(&clean_dir)?;
 
-        std::fs::write(&version_file, format!("{}\n", version))?;
+        std::fs::write(&version_file, format!("{version}\n"))?;
 
         println!(
-            "✅ Created .cleanlanguage/.cleanversion file with version {}",
-            version
+            "✅ Created .cleanlanguage/.cleanversion file with version {version}"
         );
-        println!("   Project will now use Clean Language version {}", version);
+        println!("   Project will now use Clean Language version {version}");
 
         Ok(())
     }

@@ -22,7 +22,7 @@ pub fn use_version(version: &str) -> Result<()> {
     let shim_manager = ShimManager::new(config);
     shim_manager.create_shim(version)?;
 
-    println!("Now using Clean Language version {}", version);
+    println!("Now using Clean Language version {version}");
     println!();
     println!("Verify with: cln --version");
 

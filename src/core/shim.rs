@@ -32,7 +32,7 @@ impl ShimManager {
         // Create smart shim that checks for project versions
         self.create_smart_shim(&shim_path)?;
 
-        println!("✅ Activated Clean Language version {}", version);
+        println!("✅ Activated Clean Language version {version}");
 
         Ok(())
     }

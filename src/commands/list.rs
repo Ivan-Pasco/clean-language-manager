@@ -38,7 +38,7 @@ pub fn list_versions() -> Result<()> {
     println!();
 
     if let Some(active_version) = version_manager.get_active_version() {
-        println!("Active version: {}", active_version);
+        println!("Active version: {active_version}");
     } else {
         println!("No active version set. Use 'cleanmanager use <version>' to activate a version.");
     }

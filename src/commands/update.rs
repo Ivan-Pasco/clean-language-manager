@@ -18,8 +18,7 @@ pub fn update_self() -> Result<()> {
 
     if latest_release.tag_name.trim_start_matches('v') == current_version {
         println!(
-            "✅ cleanmanager is up to date (version {})",
-            current_version
+            "✅ cleanmanager is up to date (version {current_version})"
         );
 
         let mut config = Config::load()?;
@@ -104,17 +103,15 @@ pub fn check_for_updates() -> Result<()> {
 pub fn check_updates_if_needed() -> Result<()> {
     let mut config = Config::load()?;
 
-    if config.should_check_updates() {
-        if let Ok(_) = check_for_updates() {
+    if config.should_check_updates()
+        && check_for_updates().is_ok() {
             let _ = config.update_last_check_time();
         }
-    }
 
-    if config.should_check_self_updates() {
-        if let Ok(_) = update_self() {
+    if config.should_check_self_updates()
+        && update_self().is_ok() {
             let _ = config.update_last_self_check_time();
         }
-    }
 
     Ok(())
 }

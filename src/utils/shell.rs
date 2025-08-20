@@ -75,8 +75,8 @@ pub fn add_to_path(bin_dir: &Path) -> Result<()> {
 
     // Prepare the export line based on shell type
     let export_line = match shell.as_str() {
-        "fish" => format!("set -gx PATH \"{}\" $PATH", bin_dir_str),
-        _ => format!("export PATH=\"{}:$PATH\"", bin_dir_str),
+        "fish" => format!("set -gx PATH \"{bin_dir_str}\" $PATH"),
+        _ => format!("export PATH=\"{bin_dir_str}:$PATH\""),
     };
 
     // Add to config file
@@ -85,9 +85,9 @@ pub fn add_to_path(bin_dir: &Path) -> Result<()> {
         .append(true)
         .open(&config_path)?;
 
-    writeln!(file, "")?;
+    writeln!(file)?;
     writeln!(file, "# Added by Clean Language Manager")?;
-    writeln!(file, "{}", export_line)?;
+    writeln!(file, "{export_line}")?;
 
     println!("✅ Added to PATH in {}", config_path.display());
     Ok(())
@@ -117,8 +117,8 @@ pub fn get_reload_instructions() -> String {
         .unwrap_or_else(|_| "~/.bashrc".to_string());
 
     match shell.as_str() {
-        "zsh" => format!("source {}", config_path),
+        "zsh" => format!("source {config_path}"),
         "fish" => "source ~/.config/fish/config.fish".to_string(),
-        _ => format!("source {}", config_path),
+        _ => format!("source {config_path}"),
     }
 }

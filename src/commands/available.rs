@@ -54,7 +54,7 @@ pub fn list_available_versions() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("⚠️  Unable to fetch releases from GitHub: {}", e);
+            println!("⚠️  Unable to fetch releases from GitHub: {e}");
             println!("   This may be because:");
             println!("   • The repository doesn't have releases yet");
             println!("   • Network connectivity issues");

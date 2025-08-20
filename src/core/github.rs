@@ -29,8 +29,7 @@ impl GitHubClient {
 
     pub fn get_releases(&self, repo_owner: &str, repo_name: &str) -> Result<Vec<Release>> {
         let url = format!(
-            "https://api.github.com/repos/{}/{}/releases",
-            repo_owner, repo_name
+            "https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
         );
 
         let output = Command::new("curl")
@@ -54,8 +53,7 @@ impl GitHubClient {
 
     pub fn get_latest_release(&self, repo_owner: &str, repo_name: &str) -> Result<Release> {
         let url = format!(
-            "https://api.github.com/repos/{}/{}/releases/latest",
-            repo_owner, repo_name
+            "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
         );
 
         let output = Command::new("curl")
