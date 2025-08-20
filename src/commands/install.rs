@@ -106,9 +106,7 @@ pub fn install_version(version: &str) -> Result<()> {
                 println!("  • {}", asset.name);
             }
             CleanManagerError::BinaryNotFound {
-                name: format!(
-                    "Asset for platform {platform_suffix} (or universal binary)"
-                ),
+                name: format!("Asset for platform {platform_suffix} (or universal binary)"),
             }
         })?;
 
@@ -169,9 +167,7 @@ pub fn install_version(version: &str) -> Result<()> {
         println!(" ✅");
     }
 
-    println!(
-        "✅ Successfully installed Clean Language version {actual_version}"
-    );
+    println!("✅ Successfully installed Clean Language version {actual_version}");
     println!("   Binary location: {binary_path:?}");
     println!();
     println!("To use this version, run:");

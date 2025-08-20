@@ -23,18 +23,14 @@ pub fn set_local_version(version: &str) -> Result<()> {
         .and_then(|name| name.to_str())
         .unwrap_or("current project");
 
-    println!(
-        "Setting Clean Language version for {project_name}: {version}"
-    );
+    println!("Setting Clean Language version for {project_name}: {version}");
 
     // Create .cleanlanguage/.cleanversion file
     config.set_project_version(version)?;
 
     println!();
     println!("💡 Usage:");
-    println!(
-        "  - When you run 'cln' in this directory, it will use version {version}"
-    );
+    println!("  - When you run 'cln' in this directory, it will use version {version}");
     println!("  - The .cleanlanguage/.cleanversion file has been added to your project");
     println!("  - Consider adding .cleanlanguage/ to your version control system");
     println!();

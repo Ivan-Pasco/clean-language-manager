@@ -75,9 +75,7 @@ pub fn check_environment() -> Result<()> {
 
         // Check for project version
         if let Some(project_version) = config.get_project_version() {
-            println!(
-                "  📁 Project version (.cleanlanguage/.cleanversion): {project_version}"
-            );
+            println!("  📁 Project version (.cleanlanguage/.cleanversion): {project_version}");
 
             // Verify project version is installed
             if version_manager.is_version_installed(&project_version) {
@@ -102,9 +100,7 @@ pub fn check_environment() -> Result<()> {
 
     // Show effective version
     if let Some(effective_version) = config.get_effective_version() {
-        println!(
-            "  ⚙️  Effective version (what 'cln' will use): {effective_version}"
-        );
+        println!("  ⚙️  Effective version (what 'cln' will use): {effective_version}");
 
         let binary_path = config.get_version_binary(&effective_version);
         if binary_path.exists() {

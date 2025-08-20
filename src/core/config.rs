@@ -151,9 +151,7 @@ impl Config {
 
         std::fs::write(&version_file, format!("{version}\n"))?;
 
-        println!(
-            "✅ Created .cleanlanguage/.cleanversion file with version {version}"
-        );
+        println!("✅ Created .cleanlanguage/.cleanversion file with version {version}");
         println!("   Project will now use Clean Language version {version}");
 
         Ok(())

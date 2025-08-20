@@ -22,9 +22,7 @@ pub fn sync_project_version() -> Result<()> {
     // Look for .cleanlanguage/.cleanversion file
     match config.get_project_version() {
         Some(project_version) => {
-            println!(
-                "📋 Found .cleanlanguage/.cleanversion file specifying: {project_version}"
-            );
+            println!("📋 Found .cleanlanguage/.cleanversion file specifying: {project_version}");
 
             // Check if version is already installed
             if version_manager.is_version_installed(&project_version) {
@@ -33,9 +31,7 @@ pub fn sync_project_version() -> Result<()> {
                 println!("🎉 Project is ready to use!");
                 println!("   Run 'cln --version' to verify");
             } else {
-                println!(
-                    "📦 Version {project_version} is not installed, installing now..."
-                );
+                println!("📦 Version {project_version} is not installed, installing now...");
                 println!();
 
                 // Install the version
@@ -56,9 +52,7 @@ pub fn sync_project_version() -> Result<()> {
                         println!();
                         println!("💡 You can try:");
                         println!("  cleanmanager available    # Check available versions");
-                        println!(
-                            "  cleanmanager install {project_version}   # Install manually"
-                        );
+                        println!("  cleanmanager install {project_version}   # Install manually");
                         return Err(e);
                     }
                 }

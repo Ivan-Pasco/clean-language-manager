@@ -37,9 +37,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
     }
 
     // Confirm uninstallation
-    print!(
-        "Are you sure you want to uninstall version {version}? [y/N]: "
-    );
+    print!("Are you sure you want to uninstall version {version}? [y/N]: ");
     io::stdout().flush()?;
 
     let mut input = String::new();
@@ -54,9 +52,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
     println!("Removing version directory: {version_dir:?}");
     std::fs::remove_dir_all(&version_dir)?;
 
-    println!(
-        "✅ Successfully uninstalled Clean Language version {version}"
-    );
+    println!("✅ Successfully uninstalled Clean Language version {version}");
 
     // Show remaining versions if any
     let versions_dir = config.get_versions_dir();
