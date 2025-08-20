@@ -113,8 +113,8 @@ impl Config {
     }
 
     /// Recursively search for .cleanlanguage/.cleanversion file in current directory and parents
-    fn find_version_file_in_tree(&self, start_dir: &PathBuf) -> Option<String> {
-        let mut current_dir = start_dir.clone();
+    fn find_version_file_in_tree(&self, start_dir: &std::path::Path) -> Option<String> {
+        let mut current_dir = start_dir.to_path_buf();
 
         loop {
             // Check for .cleanlanguage/.cleanversion file in current directory

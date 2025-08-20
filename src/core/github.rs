@@ -19,6 +19,7 @@ pub struct Asset {
 }
 
 pub struct GitHubClient {
+    #[allow(dead_code)]
     github_token: Option<String>,
 }
 
@@ -71,6 +72,7 @@ impl GitHubClient {
         Ok(release)
     }
 
+    #[allow(dead_code)]
     pub fn download_asset(&self, asset: &Asset, dest_path: &std::path::Path) -> Result<()> {
         // Ensure parent directory exists
         if let Some(parent) = dest_path.parent() {

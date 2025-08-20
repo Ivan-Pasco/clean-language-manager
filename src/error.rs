@@ -18,6 +18,7 @@ pub enum CleanManagerError {
     VersionAlreadyInstalled { version: String },
 
     #[error("No version is currently active")]
+    #[allow(dead_code)]
     NoActiveVersion,
 
     #[error("Invalid version format: '{version}'")]
@@ -27,6 +28,7 @@ pub enum CleanManagerError {
     ConfigError { message: String },
 
     #[error("GitHub API error: {message}")]
+    #[allow(dead_code)]
     GitHubError { message: String },
 
     #[error("Download failed: {url}")]
@@ -48,6 +50,7 @@ pub enum CleanManagerError {
     BinaryNotFound { name: String },
 
     #[error("Environment setup error: {message}")]
+    #[allow(dead_code)]
     EnvironmentError { message: String },
 
     #[error("Binary validation error: {message}")]
@@ -63,24 +66,28 @@ impl From<anyhow::Error> for CleanManagerError {
 }
 
 impl CleanManagerError {
+    #[allow(dead_code)]
     pub fn config_error<S: Into<String>>(message: S) -> Self {
         CleanManagerError::ConfigError {
             message: message.into(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn github_error<S: Into<String>>(message: S) -> Self {
         CleanManagerError::GitHubError {
             message: message.into(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn shell_error<S: Into<String>>(message: S) -> Self {
         CleanManagerError::ShellError {
             message: message.into(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn environment_error<S: Into<String>>(message: S) -> Self {
         CleanManagerError::EnvironmentError {
             message: message.into(),

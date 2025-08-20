@@ -2,6 +2,11 @@
 
 This file provides guidance when working with code in this repository.
 
+## Important Constraints
+
+- **NEVER** write any reference to Claude Code in any documents, git commits, or any part of the code
+- **NEVER** mention Claude Code in git commit messages or any part of the codebase
+
 ## Overview
 
 This is the **Clean Language Manager** (`cleanmanager`), a Rust-based version manager for the Clean Language compiler (`cln`). It allows developers to install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems.

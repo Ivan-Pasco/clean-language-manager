@@ -47,12 +47,14 @@ impl ShimManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_current_shim_target(&self) -> Result<Option<String>> {
         // Use the effective version (project-specific or global)
         Ok(self.config.get_effective_version())
     }
 
     /// Get the version that should be used for the current directory
+    #[allow(dead_code)]
     pub fn get_effective_version(&self) -> Option<String> {
         self.config.get_effective_version()
     }
@@ -83,6 +85,7 @@ impl ShimManager {
     }
 
     #[cfg(unix)]
+    #[allow(dead_code)]
     fn resolve_link(&self, link: &Path) -> Result<std::path::PathBuf> {
         Ok(std::fs::read_link(link)?)
     }
@@ -94,6 +97,7 @@ impl ShimManager {
         Ok(_link.to_path_buf())
     }
 
+    #[allow(dead_code)]
     pub fn verify_shim(&self) -> Result<bool> {
         let shim_path = self.config.get_shim_path();
 
@@ -110,6 +114,7 @@ impl ShimManager {
         Ok(false)
     }
 
+    #[allow(dead_code)]
     pub fn get_config(&self) -> &Config {
         &self.config
     }

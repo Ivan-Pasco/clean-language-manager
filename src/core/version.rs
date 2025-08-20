@@ -72,6 +72,7 @@ impl VersionManager {
         self.config.active_version.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn install_version(&self, version: &str, binary_path: &std::path::Path) -> Result<()> {
         if self.is_version_installed(version) {
             return Err(CleanManagerError::VersionAlreadyInstalled {
@@ -94,6 +95,7 @@ impl VersionManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn uninstall_version(&self, version: &str) -> Result<()> {
         if !self.is_version_installed(version) {
             return Err(CleanManagerError::VersionNotFound {
@@ -124,6 +126,7 @@ impl VersionManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_config(&self) -> &Config {
         &self.config
     }
