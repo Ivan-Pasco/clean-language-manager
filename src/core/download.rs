@@ -1,9 +1,9 @@
 use anyhow::Result;
-use std::path::Path;
 use flate2::read::GzDecoder;
+use std::fs::File;
+use std::path::Path;
 use tar::Archive;
 use zip::ZipArchive;
-use std::fs::File;
 
 pub struct Downloader;
 
@@ -14,15 +14,15 @@ impl Downloader {
 
     pub fn download_file(&self, url: &str, destination: &Path) -> Result<()> {
         println!("Downloading from {}...", url);
-        
+
         // Ensure parent directory exists
         if let Some(parent) = destination.parent() {
             std::fs::create_dir_all(parent)?;
         }
 
         let output = std::process::Command::new("curl")
-            .arg("-L")  // Follow redirects
-            .arg("-s")  // Silent
+            .arg("-L") // Follow redirects
+            .arg("-s") // Silent
             .arg("-H")
             .arg("User-Agent: cleanmanager/0.1.0")
             .arg("-o")
@@ -36,16 +36,16 @@ impl Downloader {
                 output.status.code()
             ));
         }
-        
+
         println!("Downloaded to {:?}", destination);
         Ok(())
     }
 
     pub fn extract_archive(&self, archive_path: &Path, destination: &Path) -> Result<()> {
         println!("Extracting {:?} to {:?}", archive_path, destination);
-        
+
         std::fs::create_dir_all(destination)?;
-        
+
         let file_name = archive_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -56,10 +56,7 @@ impl Downloader {
         } else if file_name.ends_with(".zip") {
             self.extract_zip(archive_path, destination)?;
         } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported archive format: {}",
-                file_name
-            ));
+            return Err(anyhow::anyhow!("Unsupported archive format: {}", file_name));
         }
 
         println!("Extraction completed");
@@ -77,7 +74,7 @@ impl Downloader {
     fn extract_zip(&self, archive_path: &Path, destination: &Path) -> Result<()> {
         let file = File::open(archive_path)?;
         let mut archive = ZipArchive::new(file)?;
-        
+
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
             let outpath = match file.enclosed_name() {

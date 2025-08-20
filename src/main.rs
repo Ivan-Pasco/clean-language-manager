@@ -1,5 +1,5 @@
-use clap::{Parser, Subcommand};
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 
 mod commands;
 mod core;
@@ -18,9 +18,9 @@ pub struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Install a specific version of Clean Language
-    Install { 
+    Install {
         /// Version to install (e.g., 1.2.3, latest)
-        version: String 
+        version: String,
     },
     /// Install the version specified in .cleanlanguage/.cleanversion file
     Sync,
@@ -29,19 +29,19 @@ enum Commands {
     /// List available versions from GitHub
     Available,
     /// Switch to a specific version globally
-    Use { 
+    Use {
         /// Version to use globally
-        version: String 
+        version: String,
     },
     /// Set project-specific version (creates .cleanlanguage/.cleanversion file)
     Local {
         /// Version to use in this project
-        version: String
+        version: String,
     },
     /// Uninstall a specific version
-    Uninstall { 
+    Uninstall {
         /// Version to uninstall
-        version: String 
+        version: String,
     },
     /// Initialize shell configuration
     Init,
@@ -60,15 +60,9 @@ fn main() -> Result<()> {
         Commands::Install { version } => {
             commands::install::install_version(&version).map_err(|e| anyhow::anyhow!(e))
         }
-        Commands::Sync => {
-            commands::sync::sync_project_version().map_err(|e| anyhow::anyhow!(e))
-        }
-        Commands::List => {
-            commands::list::list_versions().map_err(|e| anyhow::anyhow!(e))
-        }
-        Commands::Available => {
-            commands::available::list_available_versions()
-        }
+        Commands::Sync => commands::sync::sync_project_version().map_err(|e| anyhow::anyhow!(e)),
+        Commands::List => commands::list::list_versions().map_err(|e| anyhow::anyhow!(e)),
+        Commands::Available => commands::available::list_available_versions(),
         Commands::Use { version } => {
             commands::use_version::use_version(&version).map_err(|e| anyhow::anyhow!(e))
         }
@@ -78,18 +72,10 @@ fn main() -> Result<()> {
         Commands::Uninstall { version } => {
             commands::uninstall::uninstall_version(&version).map_err(|e| anyhow::anyhow!(e))
         }
-        Commands::Init => {
-            commands::init::init_shell().map_err(|e| anyhow::anyhow!(e))
-        }
-        Commands::Doctor => {
-            commands::doctor::check_environment().map_err(|e| anyhow::anyhow!(e))
-        }
-        Commands::Update => {
-            commands::update::check_for_updates().map_err(|e| anyhow::anyhow!(e))
-        }
-        Commands::SelfUpdate => {
-            commands::update::update_self().map_err(|e| anyhow::anyhow!(e))
-        }
+        Commands::Init => commands::init::init_shell().map_err(|e| anyhow::anyhow!(e)),
+        Commands::Doctor => commands::doctor::check_environment().map_err(|e| anyhow::anyhow!(e)),
+        Commands::Update => commands::update::check_for_updates().map_err(|e| anyhow::anyhow!(e)),
+        Commands::SelfUpdate => commands::update::update_self().map_err(|e| anyhow::anyhow!(e)),
     };
 
     if let Err(e) = result {

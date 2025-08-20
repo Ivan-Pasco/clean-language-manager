@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
+use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::env;
 
 /// Detect the current shell being used
 pub fn detect_shell() -> String {
@@ -16,7 +16,7 @@ pub fn detect_shell() -> String {
             return "fish".to_string();
         }
     }
-    
+
     // Fallback to bash as most common
     "bash".to_string()
 }
@@ -40,7 +40,7 @@ pub fn get_shell_config_path() -> Result<PathBuf> {
             // Prefer .bashrc, fallback to .bash_profile
             let bashrc = home.join(".bashrc");
             let bash_profile = home.join(".bash_profile");
-            
+
             if bashrc.exists() {
                 Ok(bashrc)
             } else {
@@ -66,29 +66,29 @@ pub fn add_to_path(bin_dir: &Path) -> Result<()> {
     let shell = detect_shell();
     let config_path = get_shell_config_path()?;
     let bin_dir_str = bin_dir.to_string_lossy();
-    
+
     // Check if already configured in the file
     if config_path.exists() && is_already_configured(&config_path, &bin_dir_str)? {
         println!("✅ PATH already configured in {}", config_path.display());
         return Ok(());
     }
-    
+
     // Prepare the export line based on shell type
     let export_line = match shell.as_str() {
         "fish" => format!("set -gx PATH \"{}\" $PATH", bin_dir_str),
         _ => format!("export PATH=\"{}:$PATH\"", bin_dir_str),
     };
-    
+
     // Add to config file
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&config_path)?;
-    
+
     writeln!(file, "")?;
     writeln!(file, "# Added by Clean Language Manager")?;
     writeln!(file, "{}", export_line)?;
-    
+
     println!("✅ Added to PATH in {}", config_path.display());
     Ok(())
 }
@@ -97,14 +97,15 @@ pub fn add_to_path(bin_dir: &Path) -> Result<()> {
 fn is_already_configured(config_path: &Path, bin_dir: &str) -> Result<bool> {
     let file = File::open(config_path)?;
     let reader = BufReader::new(file);
-    
+
     for line in reader.lines() {
         let line = line?;
-        if line.contains(bin_dir) && (line.contains("export PATH") || line.contains("set -gx PATH")) {
+        if line.contains(bin_dir) && (line.contains("export PATH") || line.contains("set -gx PATH"))
+        {
             return Ok(true);
         }
     }
-    
+
     Ok(false)
 }
 
@@ -114,7 +115,7 @@ pub fn get_reload_instructions() -> String {
     let config_path = get_shell_config_path()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "~/.bashrc".to_string());
-    
+
     match shell.as_str() {
         "zsh" => format!("source {}", config_path),
         "fish" => "source ~/.config/fish/config.fish".to_string(),

@@ -1,32 +1,26 @@
-use crate::error::{Result, CleanManagerError};
+use crate::error::{CleanManagerError, Result};
 use std::path::Path;
 
 pub fn ensure_dir_exists(path: &Path) -> Result<()> {
     if !path.exists() {
-        std::fs::create_dir_all(path)
-            .map_err(|e| match e.kind() {
-                std::io::ErrorKind::PermissionDenied => {
-                    CleanManagerError::PermissionDenied {
-                        path: path.to_path_buf(),
-                    }
-                }
-                _ => CleanManagerError::from(e),
-            })?;
+        std::fs::create_dir_all(path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => CleanManagerError::PermissionDenied {
+                path: path.to_path_buf(),
+            },
+            _ => CleanManagerError::from(e),
+        })?;
     }
     Ok(())
 }
 
 pub fn remove_dir_recursive(path: &Path) -> Result<()> {
     if path.exists() {
-        std::fs::remove_dir_all(path)
-            .map_err(|e| match e.kind() {
-                std::io::ErrorKind::PermissionDenied => {
-                    CleanManagerError::PermissionDenied {
-                        path: path.to_path_buf(),
-                    }
-                }
-                _ => CleanManagerError::from(e),
-            })?;
+        std::fs::remove_dir_all(path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => CleanManagerError::PermissionDenied {
+                path: path.to_path_buf(),
+            },
+            _ => CleanManagerError::from(e),
+        })?;
     }
     Ok(())
 }
@@ -35,7 +29,7 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<()> {
     if let Some(parent) = to.parent() {
         ensure_dir_exists(parent)?;
     }
-    
+
     std::fs::copy(from, to)?;
     Ok(())
 }
@@ -48,7 +42,7 @@ pub fn is_executable(path: &Path) -> bool {
             .map(|m| m.permissions().mode() & 0o111 != 0)
             .unwrap_or(false)
     }
-    
+
     #[cfg(windows)]
     {
         path.extension()
@@ -66,12 +60,12 @@ pub fn make_executable(path: &Path) -> Result<()> {
         perms.set_mode(perms.mode() | 0o755);
         std::fs::set_permissions(path, perms)?;
     }
-    
+
     // On Windows, executable permission is determined by file extension
     #[cfg(windows)]
     {
         let _ = path; // Suppress unused warning
     }
-    
+
     Ok(())
 }

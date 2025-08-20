@@ -1,5 +1,5 @@
 use crate::core::config::Config;
-use crate::error::{Result, CleanManagerError};
+use crate::error::{CleanManagerError, Result};
 use crate::utils::fs;
 use std::fs::read_dir;
 
@@ -22,25 +22,28 @@ impl VersionManager {
 
     pub fn list_installed_versions(&self) -> Result<Vec<VersionInfo>> {
         let versions_dir = self.config.get_versions_dir();
-        
+
         if !versions_dir.exists() {
             return Ok(vec![]);
         }
 
         let mut versions = Vec::new();
-        
+
         for entry in read_dir(&versions_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 if let Some(version_name) = path.file_name().and_then(|n| n.to_str()) {
                     let binary_path = self.config.get_version_binary(version_name);
                     let is_valid = binary_path.exists() && fs::is_executable(&binary_path);
-                    let is_active = self.config.active_version.as_ref()
+                    let is_active = self
+                        .config
+                        .active_version
+                        .as_ref()
                         .map(|v| v == version_name)
                         .unwrap_or(false);
-                    
+
                     versions.push(VersionInfo {
                         version: version_name.to_string(),
                         is_active,
@@ -135,12 +138,10 @@ fn version_compare(a: &str, b: &str) -> std::cmp::Ordering {
 
     for (a_part, b_part) in a_parts.iter().zip(b_parts.iter()) {
         match (a_part.parse::<u32>(), b_part.parse::<u32>()) {
-            (Ok(a_num), Ok(b_num)) => {
-                match a_num.cmp(&b_num) {
-                    Ordering::Equal => continue,
-                    other => return other,
-                }
-            }
+            (Ok(a_num), Ok(b_num)) => match a_num.cmp(&b_num) {
+                Ordering::Equal => continue,
+                other => return other,
+            },
             _ => return a_part.cmp(b_part),
         }
     }

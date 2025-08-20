@@ -1,14 +1,14 @@
-use crate::core::{config::Config, github::GitHubClient, download::Downloader};
-use crate::error::{Result, CleanManagerError};
+use crate::core::{config::Config, download::Downloader, github::GitHubClient};
+use crate::error::{CleanManagerError, Result};
 use std::path::Path;
 
 pub fn install_version(version: &str) -> Result<()> {
     println!("Installing Clean Language version: {}", version);
-    
+
     let config = Config::load()?;
     let github_client = GitHubClient::new(config.github_api_token.clone());
     let downloader = Downloader::new();
-    
+
     // Check if version is already installed
     let version_dir = config.get_version_dir(version);
     if version_dir.exists() {
@@ -16,7 +16,7 @@ pub fn install_version(version: &str) -> Result<()> {
             version: version.to_string(),
         });
     }
-    
+
     // Resolve version (handle "latest")
     let actual_version = if version == "latest" {
         println!("Fetching latest release...");
@@ -24,7 +24,7 @@ pub fn install_version(version: &str) -> Result<()> {
             Ok(release) => {
                 println!("Latest version: {}", release.tag_name);
                 release.tag_name
-            },
+            }
             Err(e) => {
                 println!("⚠️  Unable to fetch latest version from GitHub: {}", e);
                 println!("   This may be because the repository doesn't have releases yet.");
@@ -36,9 +36,9 @@ pub fn install_version(version: &str) -> Result<()> {
     } else {
         version.to_string()
     };
-    
+
     println!("Resolved version: {}", actual_version);
-    
+
     // Get releases and find the specified version
     println!("Fetching available releases...");
     let releases = match github_client.get_releases("Ivan-Pasco", "clean-language-compiler") {
@@ -55,7 +55,7 @@ pub fn install_version(version: &str) -> Result<()> {
             return Ok(());
         }
     };
-    
+
     if releases.is_empty() {
         println!("⚠️  No releases found in the repository.");
         println!("   The Clean Language compiler may still be in development.");
@@ -63,7 +63,7 @@ pub fn install_version(version: &str) -> Result<()> {
         println!("   https://github.com/Ivan-Pasco/clean-language-compiler/releases");
         return Ok(());
     }
-    
+
     let release = releases
         .iter()
         .find(|r| r.tag_name == actual_version)
@@ -76,28 +76,28 @@ pub fn install_version(version: &str) -> Result<()> {
                 version: actual_version.clone(),
             }
         })?;
-    
+
     // Find appropriate asset for current platform
     let platform_suffix = get_platform_suffix();
     println!("Looking for asset matching platform: {}", platform_suffix);
-    
+
     let asset = release
         .assets
         .iter()
         .find(|asset| {
             let name_lower = asset.name.to_lowercase();
-            name_lower.contains(&platform_suffix.to_lowercase()) ||
-            name_lower.contains("universal") ||
-            name_lower.contains("any")
+            name_lower.contains(&platform_suffix.to_lowercase())
+                || name_lower.contains("universal")
+                || name_lower.contains("any")
         })
         .or_else(|| {
             // Fallback: try to find any executable asset
             release.assets.iter().find(|asset| {
                 let name = &asset.name;
-                name.ends_with(".exe") || 
-                name.ends_with(".tar.gz") || 
-                name.ends_with(".zip") ||
-                name.contains("cln")
+                name.ends_with(".exe")
+                    || name.ends_with(".tar.gz")
+                    || name.ends_with(".zip")
+                    || name.contains("cln")
             })
         })
         .ok_or_else(|| {
@@ -106,37 +106,48 @@ pub fn install_version(version: &str) -> Result<()> {
                 println!("  • {}", asset.name);
             }
             CleanManagerError::BinaryNotFound {
-                name: format!("Asset for platform {} (or universal binary)", platform_suffix),
+                name: format!(
+                    "Asset for platform {} (or universal binary)",
+                    platform_suffix
+                ),
             }
         })?;
-    
+
     println!("Found asset: {}", asset.name);
-    
+
     // Create temporary download directory
     let temp_dir = std::env::temp_dir().join(format!("cleanmanager-{}", actual_version));
     std::fs::create_dir_all(&temp_dir)?;
-    
+
     // Download the asset
     let download_path = temp_dir.join(&asset.name);
     println!("Downloading {}...", asset.name);
-    downloader.download_file(&asset.browser_download_url, &download_path).map_err(|_e| CleanManagerError::DownloadError { url: asset.browser_download_url.clone() })?;
-    
+    downloader
+        .download_file(&asset.browser_download_url, &download_path)
+        .map_err(|_e| CleanManagerError::DownloadError {
+            url: asset.browser_download_url.clone(),
+        })?;
+
     // Extract to version directory
     std::fs::create_dir_all(&version_dir)?;
-    
+
     if asset.name.ends_with(".tar.gz") || asset.name.ends_with(".zip") {
         println!("Extracting archive...");
-        downloader.extract_archive(&download_path, &version_dir).map_err(|_e| CleanManagerError::ExtractionError { path: download_path.clone() })?;
+        downloader
+            .extract_archive(&download_path, &version_dir)
+            .map_err(|_e| CleanManagerError::ExtractionError {
+                path: download_path.clone(),
+            })?;
     } else {
         // Assume it's a direct binary
         let binary_name = if cfg!(windows) { "cln.exe" } else { "cln" };
         let target_path = version_dir.join(binary_name);
         std::fs::copy(&download_path, &target_path)?;
     }
-    
+
     // Find the extracted binary and ensure it's executable
     let binary_path = find_binary_in_dir(&version_dir)?;
-    
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -144,10 +155,10 @@ pub fn install_version(version: &str) -> Result<()> {
         perms.set_mode(0o755);
         std::fs::set_permissions(&binary_path, perms)?;
     }
-    
+
     // Clean up temporary files
     std::fs::remove_dir_all(&temp_dir)?;
-    
+
     // Validate the installed binary works correctly
     print!("🔍 Validating installation...");
     if let Err(e) = validate_installed_binary(&binary_path) {
@@ -158,36 +169,39 @@ pub fn install_version(version: &str) -> Result<()> {
     } else {
         println!(" ✅");
     }
-    
-    println!("✅ Successfully installed Clean Language version {}", actual_version);
+
+    println!(
+        "✅ Successfully installed Clean Language version {}",
+        actual_version
+    );
     println!("   Binary location: {:?}", binary_path);
     println!();
     println!("To use this version, run:");
     println!("   cleanmanager use {}", actual_version);
-    
+
     Ok(())
 }
 
 fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Result<(), String> {
     use std::process::Command;
-    
+
     // Test 1: Check if binary exists and is executable
     if !binary_path.exists() {
         return Err("Binary file does not exist".to_string());
     }
-    
+
     // Test 2: Check if binary can show version (basic execution test)
-    let version_output = Command::new(binary_path)
-        .args(&["version"])
-        .output();
-    
+    let version_output = Command::new(binary_path).args(&["version"]).output();
+
     match version_output {
         Ok(output) => {
             if !output.status.success() {
-                return Err(format!("Binary failed to execute: exit code {}", 
-                    output.status.code().unwrap_or(-1)));
+                return Err(format!(
+                    "Binary failed to execute: exit code {}",
+                    output.status.code().unwrap_or(-1)
+                ));
             }
-            
+
             let version_text = String::from_utf8_lossy(&output.stdout);
             if !version_text.contains("Clean Language Compiler") {
                 return Err("Binary does not appear to be Clean Language compiler".to_string());
@@ -197,30 +211,34 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
             return Err(format!("Failed to execute binary: {}", e));
         }
     }
-    
+
     // Test 3: Try to compile a simple test program
     let test_program = r#"start()
 	print("test")"#;
-    
+
     // Create a temporary test file
     let temp_dir = std::env::temp_dir();
     let test_file = temp_dir.join("cleanmanager_test.cln");
     let test_wasm = temp_dir.join("cleanmanager_test.wasm");
-    
+
     // Write test program
     if let Err(e) = std::fs::write(&test_file, test_program) {
         return Err(format!("Failed to create test file: {}", e));
     }
-    
+
     // Try to compile
     let compile_result = Command::new(binary_path)
-        .args(&["compile", test_file.to_str().unwrap(), test_wasm.to_str().unwrap()])
+        .args(&[
+            "compile",
+            test_file.to_str().unwrap(),
+            test_wasm.to_str().unwrap(),
+        ])
         .output();
-    
+
     // Clean up test files
     let _ = std::fs::remove_file(&test_file);
     let _ = std::fs::remove_file(&test_wasm);
-    
+
     match compile_result {
         Ok(output) => {
             if !output.status.success() {
@@ -232,7 +250,7 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
             return Err(format!("Failed to run compilation test: {}", e));
         }
     }
-    
+
     Ok(())
 }
 
@@ -246,7 +264,7 @@ fn get_platform_suffix() -> String {
     } else {
         "unknown"
     };
-    
+
     let arch = if cfg!(target_arch = "x86_64") {
         "x86_64"
     } else if cfg!(target_arch = "aarch64") {
@@ -254,24 +272,24 @@ fn get_platform_suffix() -> String {
     } else {
         "unknown"
     };
-    
+
     format!("{}-{}", os, arch)
 }
 
 fn find_binary_in_dir(dir: &Path) -> Result<std::path::PathBuf> {
     let binary_name = if cfg!(windows) { "cln.exe" } else { "cln" };
-    
+
     // Look for binary in the root directory first
     let direct_path = dir.join(binary_name);
     if direct_path.exists() {
         return Ok(direct_path);
     }
-    
+
     // Search recursively for the binary
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             if let Ok(found) = find_binary_in_dir(&path) {
                 return Ok(found);
@@ -280,7 +298,7 @@ fn find_binary_in_dir(dir: &Path) -> Result<std::path::PathBuf> {
             return Ok(path);
         }
     }
-    
+
     Err(CleanManagerError::BinaryNotFound {
         name: binary_name.to_string(),
     }

@@ -1,5 +1,5 @@
 use crate::core::config::Config;
-use crate::error::{Result, CleanManagerError};
+use crate::error::{CleanManagerError, Result};
 use crate::utils::fs;
 use std::path::Path;
 
@@ -33,17 +33,17 @@ impl ShimManager {
         self.create_smart_shim(&shim_path)?;
 
         println!("✅ Activated Clean Language version {}", version);
-        
+
         Ok(())
     }
 
     pub fn remove_shim(&self) -> Result<()> {
         let shim_path = self.config.get_shim_path();
-        
+
         if shim_path.exists() {
             std::fs::remove_file(&shim_path)?;
         }
-        
+
         Ok(())
     }
 
@@ -65,7 +65,7 @@ impl ShimManager {
             let binary_path = self.config.get_version_binary(version);
             self.create_link(&binary_path, shim_path)?;
         }
-        
+
         Ok(())
     }
 
@@ -96,7 +96,7 @@ impl ShimManager {
 
     pub fn verify_shim(&self) -> Result<bool> {
         let shim_path = self.config.get_shim_path();
-        
+
         if !shim_path.exists() {
             return Ok(false);
         }

@@ -1,8 +1,8 @@
-use crate::error::{Result, CleanManagerError};
+use crate::error::{CleanManagerError, Result};
 use crate::utils::fs;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -22,8 +22,8 @@ fn default_true() -> bool {
 
 impl Default for Config {
     fn default() -> Self {
-        let cleanmanager_dir = get_cleanmanager_dir()
-            .unwrap_or_else(|_| PathBuf::from(".cleanmanager"));
+        let cleanmanager_dir =
+            get_cleanmanager_dir().unwrap_or_else(|_| PathBuf::from(".cleanmanager"));
 
         Config {
             active_version: None,
@@ -40,7 +40,7 @@ impl Default for Config {
 impl Config {
     pub fn new() -> Result<Self> {
         let cleanmanager_dir = get_cleanmanager_dir()?;
-        
+
         Ok(Config {
             active_version: None,
             cleanmanager_dir,
@@ -54,7 +54,7 @@ impl Config {
 
     pub fn load() -> Result<Self> {
         let config_path = get_config_path()?;
-        
+
         if !config_path.exists() {
             let config = Self::new()?;
             config.save()?;
@@ -63,18 +63,18 @@ impl Config {
 
         let content = std::fs::read_to_string(&config_path)?;
         let config: Config = serde_json::from_str(&content)?;
-        
+
         // Ensure directories exist
         fs::ensure_dir_exists(&config.cleanmanager_dir)?;
         fs::ensure_dir_exists(&config.get_versions_dir())?;
         fs::ensure_dir_exists(&config.get_bin_dir())?;
-        
+
         Ok(config)
     }
 
     pub fn save(&self) -> Result<()> {
         let config_path = get_config_path()?;
-        
+
         // Ensure parent directory exists
         if let Some(parent) = config_path.parent() {
             fs::ensure_dir_exists(parent)?;
@@ -82,7 +82,7 @@ impl Config {
 
         let content = serde_json::to_string_pretty(self)?;
         std::fs::write(&config_path, content)?;
-        
+
         Ok(())
     }
 
@@ -102,7 +102,7 @@ impl Config {
         if let Some(project_version) = self.get_project_version() {
             return Some(project_version);
         }
-        
+
         // Fall back to global active version
         self.active_version.clone()
     }
@@ -115,12 +115,12 @@ impl Config {
     /// Recursively search for .cleanlanguage/.cleanversion file in current directory and parents
     fn find_version_file_in_tree(&self, start_dir: &PathBuf) -> Option<String> {
         let mut current_dir = start_dir.clone();
-        
+
         loop {
             // Check for .cleanlanguage/.cleanversion file in current directory
             let clean_dir = current_dir.join(".cleanlanguage");
             let version_file = clean_dir.join(".cleanversion");
-            
+
             if version_file.exists() {
                 if let Ok(content) = std::fs::read_to_string(&version_file) {
                     let version = content.trim().to_string();
@@ -129,14 +129,14 @@ impl Config {
                     }
                 }
             }
-            
+
             // Move to parent directory
             match current_dir.parent() {
                 Some(parent) => current_dir = parent.to_path_buf(),
                 None => break,
             }
         }
-        
+
         None
     }
 
@@ -145,15 +145,18 @@ impl Config {
         let current_dir = env::current_dir()?;
         let clean_dir = current_dir.join(".cleanlanguage");
         let version_file = clean_dir.join(".cleanversion");
-        
+
         // Create .cleanlanguage directory if it doesn't exist
         std::fs::create_dir_all(&clean_dir)?;
-        
+
         std::fs::write(&version_file, format!("{}\n", version))?;
-        
-        println!("✅ Created .cleanlanguage/.cleanversion file with version {}", version);
+
+        println!(
+            "✅ Created .cleanlanguage/.cleanversion file with version {}",
+            version
+        );
         println!("   Project will now use Clean Language version {}", version);
-        
+
         Ok(())
     }
 
@@ -183,7 +186,7 @@ impl Config {
         if !self.check_updates {
             return false;
         }
-        
+
         match &self.last_update_check {
             None => true,
             Some(last_check) => {
@@ -192,7 +195,7 @@ impl Config {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_secs() as i64;
-                    
+
                     (now - last_time) > 86400
                 } else {
                     true
@@ -207,7 +210,7 @@ impl Config {
             .unwrap()
             .as_secs()
             .to_string();
-        
+
         self.last_update_check = Some(now);
         self.save()
     }
@@ -216,7 +219,7 @@ impl Config {
         if !self.check_updates {
             return false;
         }
-        
+
         match &self.last_self_update_check {
             None => true,
             Some(last_check) => {
@@ -225,7 +228,7 @@ impl Config {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_secs() as i64;
-                    
+
                     (now - last_time) > 604800
                 } else {
                     true
@@ -240,7 +243,7 @@ impl Config {
             .unwrap()
             .as_secs()
             .to_string();
-        
+
         self.last_self_update_check = Some(now);
         self.save()
     }

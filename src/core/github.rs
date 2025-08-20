@@ -84,8 +84,8 @@ impl GitHubClient {
         }
 
         let output = Command::new("curl")
-            .arg("-L")  // Follow redirects
-            .arg("-s")  // Silent
+            .arg("-L") // Follow redirects
+            .arg("-s") // Silent
             .arg("-H")
             .arg("User-Agent: cleanmanager/0.1.0")
             .arg("-o")
