@@ -9,7 +9,7 @@ This file provides guidance when working with code in this repository.
 
 ## Overview
 
-This is the **Clean Language Manager** (`cleanmanager`), a Rust-based version manager for the Clean Language compiler (`cln`). It allows developers to install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems.
+This is the **Clean Language Manager** (`cleen`), a Rust-based version manager for the Clean Language compiler (`cln`). It allows developers to install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems.
 
 ## Project Status
 
@@ -39,7 +39,7 @@ The Clean Language Manager is **fully implemented** with the following architect
 - ✅ **Version Management**: Downloads and installs compiler binaries from GitHub releases
 - ✅ **Shim System**: Creates symbolic links to route `cln` commands to active versions  
 - ✅ **PATH Management**: Automatically configures shell environments
-- ✅ **Storage Structure**: Organizes versions in isolated directories (`~/.cleanmanager/versions/<version>/`)
+- ✅ **Storage Structure**: Organizes versions in isolated directories (`~/.cleen/versions/<version>/`)
 
 **Working Commands:**
 ```bash
@@ -48,15 +48,15 @@ cargo build --release
 cargo test
 
 # Core functionality (all working)
-cleanmanager install <version>     # Install any available version
-cleanmanager available            # List GitHub releases
-cleanmanager list                # Show installed versions
-cleanmanager use <version>       # Switch global version
-cleanmanager local <version>     # Set project version
-cleanmanager uninstall <version> # Remove version
-cleanmanager doctor              # Environment diagnostics
-cleanmanager init                # Shell setup
-cleanmanager sync                # Install from .cleanversion
+cleen install <version>     # Install any available version
+cleen available            # List GitHub releases
+cleen list                # Show installed versions
+cleen use <version>       # Switch global version
+cleen local <version>     # Set project version
+cleen uninstall <version> # Remove version
+cleen doctor              # Environment diagnostics
+cleen init                # Shell setup
+cleen sync                # Install from .cleanversion
 ```
 
 ## Codebase Structure

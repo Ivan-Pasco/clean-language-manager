@@ -35,7 +35,7 @@ pub fn set_local_version(version: &str) -> Result<()> {
     println!("  - Consider adding .cleanlanguage/ to your version control system");
     println!();
     println!("🔍 To verify, run:");
-    println!("  cleanmanager doctor");
+    println!("  cleen doctor");
 
     Ok(())
 }

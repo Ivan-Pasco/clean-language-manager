@@ -24,7 +24,7 @@ impl Downloader {
             .arg("-L") // Follow redirects
             .arg("-s") // Silent
             .arg("-H")
-            .arg("User-Agent: cleanmanager/0.1.0")
+            .arg("User-Agent: cleen/0.1.0")
             .arg("-o")
             .arg(destination)
             .arg(url)

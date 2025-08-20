@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub active_version: Option<String>,
-    pub cleanmanager_dir: PathBuf,
+    pub cleen_dir: PathBuf,
     pub auto_cleanup: bool,
     pub github_api_token: Option<String>,
     #[serde(default = "default_true")]
@@ -22,12 +22,12 @@ fn default_true() -> bool {
 
 impl Default for Config {
     fn default() -> Self {
-        let cleanmanager_dir =
-            get_cleanmanager_dir().unwrap_or_else(|_| PathBuf::from(".cleanmanager"));
+        let cleen_dir =
+            get_cleen_dir().unwrap_or_else(|_| PathBuf::from(".cleen"));
 
         Config {
             active_version: None,
-            cleanmanager_dir,
+            cleen_dir,
             auto_cleanup: false,
             github_api_token: None,
             check_updates: true,
@@ -39,11 +39,11 @@ impl Default for Config {
 
 impl Config {
     pub fn new() -> Result<Self> {
-        let cleanmanager_dir = get_cleanmanager_dir()?;
+        let cleen_dir = get_cleen_dir()?;
 
         Ok(Config {
             active_version: None,
-            cleanmanager_dir,
+            cleen_dir,
             auto_cleanup: false,
             github_api_token: std::env::var("GITHUB_TOKEN").ok(),
             check_updates: true,
@@ -65,7 +65,7 @@ impl Config {
         let config: Config = serde_json::from_str(&content)?;
 
         // Ensure directories exist
-        fs::ensure_dir_exists(&config.cleanmanager_dir)?;
+        fs::ensure_dir_exists(&config.cleen_dir)?;
         fs::ensure_dir_exists(&config.get_versions_dir())?;
         fs::ensure_dir_exists(&config.get_bin_dir())?;
 
@@ -158,11 +158,11 @@ impl Config {
     }
 
     pub fn get_versions_dir(&self) -> PathBuf {
-        self.cleanmanager_dir.join("versions")
+        self.cleen_dir.join("versions")
     }
 
     pub fn get_bin_dir(&self) -> PathBuf {
-        self.cleanmanager_dir.join("bin")
+        self.cleen_dir.join("bin")
     }
 
     pub fn get_version_dir(&self, version: &str) -> PathBuf {
@@ -246,12 +246,12 @@ impl Config {
     }
 }
 
-fn get_cleanmanager_dir() -> Result<PathBuf> {
+fn get_cleen_dir() -> Result<PathBuf> {
     dirs::home_dir()
-        .map(|home| home.join(".cleanmanager"))
+        .map(|home| home.join(".cleen"))
         .ok_or(CleanManagerError::HomeDirectoryNotFound)
 }
 
 fn get_config_path() -> Result<PathBuf> {
-    Ok(get_cleanmanager_dir()?.join("config.json"))
+    Ok(get_cleen_dir()?.join("config.json"))
 }

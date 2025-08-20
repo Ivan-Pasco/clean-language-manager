@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Clean Language Manager (`cleanmanager`) is a Rust-based version manager that provides installation, switching, and management of multiple Clean Language compiler versions across different platforms.
+The Clean Language Manager (`cleen`) is a Rust-based version manager that provides installation, switching, and management of multiple Clean Language compiler versions across different platforms.
 
 ## High-Level Architecture
 
@@ -25,7 +25,7 @@ The Clean Language Manager (`cleanmanager`) is a Rust-based version manager that
 │  └─ Shell Integration: Environment setup and detection    │
 ├─────────────────────────────────────────────────────────────┤
 │  Storage Layer                                             │
-│  └─ ~/.cleanmanager/ directory structure                  │
+│  └─ ~/.cleen/ directory structure                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,7 +34,7 @@ The Clean Language Manager (`cleanmanager`) is a Rust-based version manager that
 The Clean Language Manager uses a well-defined directory structure:
 
 ```
-~/.cleanmanager/
+~/.cleen/
 ├── bin/
 │   └── cln                    # Shim executable (symlink to active version)
 ├── versions/
@@ -133,7 +133,7 @@ GitHub Client (fetch releases)
     ↓
 Download Manager (get binary)
     ↓
-Version Manager (install to ~/.cleanmanager/versions/)
+Version Manager (install to ~/.cleen/versions/)
     ↓
 Shim Manager (update symlinks if needed)
 ```
@@ -157,7 +157,7 @@ Config Manager (persist state)
 ```
 cln command executed
     ↓
-Shim (~/.cleanmanager/bin/cln)
+Shim (~/.cleen/bin/cln)
     ↓
 Check for project version (.cleanlanguage/.cleanversion)
     ↓

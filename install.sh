@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Clean Language Manager Installer
-# This script downloads and installs the latest version of cleanmanager
+# This script downloads and installs the latest version of cleen
 
 set -e
 
@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO="Ivan-Pasco/clean-language-manager"  # Update this to actual repo
-BINARY_NAME="cleanmanager"
+BINARY_NAME="cleen"
 INSTALL_DIR="$HOME/.local/bin"
 
 # Detect platform
@@ -121,7 +121,7 @@ add_to_path() {
 }
 
 # Download and extract binary
-install_cleanmanager() {
+install_cleen() {
     local platform=$(detect_platform)
     local version=$(get_latest_version)
     
@@ -149,7 +149,7 @@ install_cleanmanager() {
     local archive_name="${BINARY_NAME}-${platform}.${archive_ext}"
     local download_url="https://github.com/$REPO/releases/download/$version/$archive_name"
     
-    echo -e "${YELLOW}Downloading cleanmanager...${NC}"
+    echo -e "${YELLOW}Downloading cleen...${NC}"
     echo "URL: $download_url"
     
     # Create temporary directory
@@ -158,7 +158,7 @@ install_cleanmanager() {
     
     # Download the archive
     if ! curl -L -o "$archive_name" "$download_url"; then
-        echo -e "${RED}Error: Failed to download cleanmanager${NC}" >&2
+        echo -e "${RED}Error: Failed to download cleen${NC}" >&2
         rm -rf "$temp_dir"
         exit 1
     fi
@@ -211,12 +211,12 @@ install_cleanmanager() {
             echo
             echo -e "${GREEN}✅ PATH configured successfully!${NC}"
             echo
-            echo -e "${YELLOW}To use cleanmanager immediately, run:${NC}"
+            echo -e "${YELLOW}To use cleen immediately, run:${NC}"
             echo -e "  ${BLUE}source $config_file${NC}"
             echo -e "${YELLOW}Or restart your terminal${NC}"
             echo
-            echo -e "${YELLOW}You can also run cleanmanager directly:${NC}"
-            echo -e "  ${BLUE}$INSTALL_DIR/cleanmanager --help${NC}"
+            echo -e "${YELLOW}You can also run cleen directly:${NC}"
+            echo -e "  ${BLUE}$INSTALL_DIR/cleen --help${NC}"
         else
             echo -e "${RED}Failed to configure PATH automatically${NC}"
             echo
@@ -232,14 +232,14 @@ install_cleanmanager() {
         echo -e "${GREEN}✅ Installation directory is already in your PATH${NC}"
         echo
         echo "You can now run:"
-        echo -e "  ${BLUE}cleanmanager --help${NC}"
+        echo -e "  ${BLUE}cleen --help${NC}"
     fi
     
     echo
     echo -e "${BLUE}Next steps:${NC}"
-    echo "1. Run: ${BLUE}cleanmanager init${NC}"
-    echo "2. Run: ${BLUE}cleanmanager doctor${NC}"
-    echo "3. Install a Clean Language version: ${BLUE}cleanmanager install <version>${NC}"
+    echo "1. Run: ${BLUE}cleen init${NC}"
+    echo "2. Run: ${BLUE}cleen doctor${NC}"
+    echo "3. Install a Clean Language version: ${BLUE}cleen install <version>${NC}"
     echo
     echo "For more information: ${BLUE}https://github.com/$REPO${NC}"
 }
@@ -260,7 +260,7 @@ main() {
         exit 1
     fi
     
-    install_cleanmanager
+    install_cleen
 }
 
 # Run the installer

@@ -12,7 +12,7 @@ pub fn list_versions() -> Result<()> {
         println!("No Clean Language versions installed.");
         println!();
         println!("To install a version, run:");
-        println!("  cleanmanager install <version>");
+        println!("  cleen install <version>");
         return Ok(());
     }
 
@@ -40,7 +40,7 @@ pub fn list_versions() -> Result<()> {
     if let Some(active_version) = version_manager.get_active_version() {
         println!("Active version: {active_version}");
     } else {
-        println!("No active version set. Use 'cleanmanager use <version>' to activate a version.");
+        println!("No active version set. Use 'cleen use <version>' to activate a version.");
     }
 
     let _ = update::check_updates_if_needed();

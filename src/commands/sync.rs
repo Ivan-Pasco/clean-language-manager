@@ -44,15 +44,15 @@ pub fn sync_project_version() -> Result<()> {
                         );
                         println!();
                         println!("🔍 Verify with:");
-                        println!("  cleanmanager doctor");
+                        println!("  cleen doctor");
                         println!("  cln --version");
                     }
                     Err(e) => {
                         println!("❌ Failed to install version {project_version}: {e}");
                         println!();
                         println!("💡 You can try:");
-                        println!("  cleanmanager available    # Check available versions");
-                        println!("  cleanmanager install {project_version}   # Install manually");
+                        println!("  cleen available    # Check available versions");
+                        println!("  cleen install {project_version}   # Install manually");
                         return Err(e);
                     }
                 }
@@ -63,13 +63,13 @@ pub fn sync_project_version() -> Result<()> {
             println!();
             println!("💡 To set up project-specific version management:");
             println!("  1. Install a Clean Language version:");
-            println!("     cleanmanager install 0.1.2");
+            println!("     cleen install 0.1.2");
             println!("  2. Set it for this project:");
-            println!("     cleanmanager local 0.1.2");
-            println!("  3. Then you can use 'cleanmanager sync' in this project");
+            println!("     cleen local 0.1.2");
+            println!("  3. Then you can use 'cleen sync' in this project");
             println!();
             println!("🔍 Or check what versions are available:");
-            println!("  cleanmanager available");
+            println!("  cleen available");
 
             return Err(CleanManagerError::ConfigError {
                 message: "No .cleanlanguage/.cleanversion file found".to_string(),

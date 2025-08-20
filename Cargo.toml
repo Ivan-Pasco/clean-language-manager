@@ -11,7 +11,7 @@ keywords = ["clean", "language", "compiler", "version-manager"]
 categories = ["development-tools"]
 
 [[bin]]
-name = "cleanmanager"
+name = "cleen"
 path = "src/main.rs"
 
 [dependencies]

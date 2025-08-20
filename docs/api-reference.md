@@ -5,7 +5,7 @@
 ### Global Options
 
 ```bash
-cleanmanager [OPTIONS] <SUBCOMMAND>
+cleen [OPTIONS] <SUBCOMMAND>
 ```
 
 **Options**:
@@ -19,7 +19,7 @@ cleanmanager [OPTIONS] <SUBCOMMAND>
 Install a specific version of Clean Language compiler.
 
 ```bash
-cleanmanager install <VERSION>
+cleen install <VERSION>
 ```
 
 **Arguments**:
@@ -27,13 +27,13 @@ cleanmanager install <VERSION>
 
 **Examples**:
 ```bash
-cleanmanager install v0.4.1    # Install specific version
-cleanmanager install latest    # Install latest available version
+cleen install v0.4.1    # Install specific version
+cleen install latest    # Install latest available version
 ```
 
 **Behavior**:
 - Downloads platform-appropriate binary from GitHub releases
-- Installs to `~/.cleanmanager/versions/<version>/`
+- Installs to `~/.cleen/versions/<version>/`
 - Validates binary and sets executable permissions
 - Updates installation metadata
 
@@ -49,7 +49,7 @@ cleanmanager install latest    # Install latest available version
 List all installed Clean Language versions.
 
 ```bash
-cleanmanager list
+cleen list
 ```
 
 **Output Format**:
@@ -83,7 +83,7 @@ Active version: v0.4.1
 List available versions from GitHub releases.
 
 ```bash
-cleanmanager available
+cleen available
 ```
 
 **Output Format**:
@@ -111,7 +111,7 @@ Clean Language Compiler Versions
 Switch to a specific version globally.
 
 ```bash
-cleanmanager use <VERSION>
+cleen use <VERSION>
 ```
 
 **Arguments**:
@@ -119,13 +119,13 @@ cleanmanager use <VERSION>
 
 **Examples**:
 ```bash
-cleanmanager use v0.4.1     # Switch to specific version
-cleanmanager use latest     # Switch to latest installed version
+cleen use v0.4.1     # Switch to specific version
+cleen use latest     # Switch to latest installed version
 ```
 
 **Behavior**:
 - Updates global shim symlink
-- Modifies `~/.cleanmanager/config.json`
+- Modifies `~/.cleen/config.json`
 - Affects all `cln` commands system-wide (unless overridden by project version)
 
 **Exit Codes**:
@@ -140,7 +140,7 @@ cleanmanager use latest     # Switch to latest installed version
 Set project-specific version.
 
 ```bash
-cleanmanager local <VERSION>
+cleen local <VERSION>
 ```
 
 **Arguments**:
@@ -148,7 +148,7 @@ cleanmanager local <VERSION>
 
 **Examples**:
 ```bash
-cleanmanager local v0.3.0   # Set project to use v0.3.0
+cleen local v0.3.0   # Set project to use v0.3.0
 ```
 
 **Behavior**:
@@ -168,7 +168,7 @@ v0.3.0
 Install the version specified in project configuration.
 
 ```bash
-cleanmanager sync
+cleen sync
 ```
 
 **Behavior**:
@@ -189,7 +189,7 @@ cleanmanager sync
 Remove a specific version from the system.
 
 ```bash
-cleanmanager uninstall <VERSION>
+cleen uninstall <VERSION>
 ```
 
 **Arguments**:
@@ -197,7 +197,7 @@ cleanmanager uninstall <VERSION>
 
 **Examples**:
 ```bash
-cleanmanager uninstall v0.3.0    # Remove specific version
+cleen uninstall v0.3.0    # Remove specific version
 ```
 
 **Behavior**:
@@ -218,12 +218,12 @@ cleanmanager uninstall v0.3.0    # Remove specific version
 Initialize shell configuration for Clean Language Manager.
 
 ```bash
-cleanmanager init
+cleen init
 ```
 
 **Behavior**:
 - Detects current shell (bash, zsh, fish, etc.)
-- Adds `~/.cleanmanager/bin` to PATH
+- Adds `~/.cleen/bin` to PATH
 - Creates or modifies shell configuration files
 - Provides interactive prompts for user consent
 - Shows manual setup instructions if automatic setup fails
@@ -245,13 +245,13 @@ cleanmanager init
 Check and repair environment setup.
 
 ```bash
-cleanmanager doctor
+cleen doctor
 ```
 
 **Diagnostic Areas**:
 
 1. **Directory Structure**
-   - Verifies `~/.cleanmanager/` exists
+   - Verifies `~/.cleen/` exists
    - Checks `versions/` and `bin/` subdirectories
    - Validates permissions
 
@@ -280,9 +280,9 @@ cleanmanager doctor
 🔍 Clean Language Manager - Environment Check
 
 📁 Directory Structure:
-  cleanmanager directory: "/Users/user/.cleanmanager"
+  cleen directory: "/Users/user/.cleen"
     ✅ exists
-  versions directory: "/Users/user/.cleanmanager/versions"
+  versions directory: "/Users/user/.cleen/versions"
     ✅ exists
 
 📦 Installed Versions:
@@ -305,7 +305,7 @@ cleanmanager doctor
 Check for Clean Language compiler updates.
 
 ```bash
-cleanmanager update
+cleen update
 ```
 
 **Behavior**:
@@ -320,8 +320,8 @@ cleanmanager update
 🎉 New version available: v0.4.2 (current: v0.4.1)
 
 To update:
-  cleanmanager install latest
-  cleanmanager use latest
+  cleen install latest
+  cleen use latest
 ```
 
 **Exit Codes**:
@@ -332,24 +332,24 @@ To update:
 
 ### self-update
 
-Update cleanmanager itself to the latest version.
+Update cleen itself to the latest version.
 
 ```bash
-cleanmanager self-update
+cleen self-update
 ```
 
 **Behavior**:
-- Checks GitHub releases for cleanmanager updates
+- Checks GitHub releases for cleen updates
 - Compares with current binary version
 - Provides installation instructions if update available
 - Updates last self-check timestamp
 
 **Output Example**:
 ```
-🔄 Checking for cleanmanager updates...
+🔄 Checking for cleen updates...
 🎉 New version available: v0.1.8 (current: v0.1.7)
 
-To update cleanmanager:
+To update cleen:
   1. Visit: https://github.com/Ivan-Pasco/clean-language-manager/releases/latest
   2. Or use the install script:
      curl -sSL https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/download/install.sh | bash
@@ -365,7 +365,7 @@ To update cleanmanager:
 
 ### Supported Variables
 
-- `CLEANMANAGER_HOME` - Override default installation directory (default: `~/.cleanmanager`)
+- `CLEANMANAGER_HOME` - Override default installation directory (default: `~/.cleen`)
 - `CLEANMANAGER_GITHUB_TOKEN` - GitHub personal access token for rate limit increases
 - `NO_COLOR` - Disable colored output
 - `CLEANMANAGER_VERBOSE` - Enable verbose logging
@@ -374,16 +374,16 @@ To update cleanmanager:
 
 ```bash
 # Custom installation directory
-export CLEANMANAGER_HOME="/opt/cleanmanager"
-cleanmanager install latest
+export CLEANMANAGER_HOME="/opt/cleen"
+cleen install latest
 
 # GitHub token for higher rate limits
 export CLEANMANAGER_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
-cleanmanager available
+cleen available
 
 # Disable colors for scripting
 export NO_COLOR=1
-cleanmanager list
+cleen list
 ```
 
 ## Exit Codes
@@ -397,7 +397,7 @@ All commands follow standard Unix exit code conventions:
 
 ## Configuration File Format
 
-### Global Config (`~/.cleanmanager/config.json`)
+### Global Config (`~/.cleen/config.json`)
 
 ```json
 {
@@ -405,7 +405,7 @@ All commands follow standard Unix exit code conventions:
   "installed_versions": {
     "v0.4.1": {
       "installed_at": "2024-01-15T10:30:00Z",
-      "binary_path": "/Users/user/.cleanmanager/versions/v0.4.1/cln",
+      "binary_path": "/Users/user/.cleen/versions/v0.4.1/cln",
       "platform": "macos-aarch64",
       "github_release": {
         "tag_name": "v0.4.1",
@@ -439,12 +439,12 @@ The manager modifies shell configuration files to add the bin directory to PATH:
 
 ```bash
 # Added by Clean Language Manager
-export PATH="$HOME/.cleanmanager/bin:$PATH"
+export PATH="$HOME/.cleen/bin:$PATH"
 ```
 
 ### Shim Mechanism
 
-The shim at `~/.cleanmanager/bin/cln` performs version resolution:
+The shim at `~/.cleen/bin/cln` performs version resolution:
 
 1. Check for `.cleanlanguage/.cleanversion` in current directory tree
 2. If found, use specified version
@@ -464,7 +464,7 @@ Available versions: v0.4.1, v0.4.0, v0.3.0...
 **Version Not Installed**:
 ```
 Error: Version 'v0.4.0' is not installed
-Run 'cleanmanager install v0.4.0' to install it
+Run 'cleen install v0.4.0' to install it
 ```
 
 **Network Error**:
@@ -475,7 +475,7 @@ Check your internet connection and try again
 
 **Permission Error**:
 ```
-Error: Permission denied writing to ~/.cleanmanager
+Error: Permission denied writing to ~/.cleen
 Check directory permissions or run with appropriate privileges
 ```
 
@@ -486,7 +486,7 @@ Set `CLEANMANAGER_VERBOSE=1` for detailed operation logging:
 
 ```bash
 export CLEANMANAGER_VERBOSE=1
-cleanmanager install v0.4.1
+cleen install v0.4.1
 ```
 
 **Verbose Output Includes**:
@@ -496,4 +496,4 @@ cleanmanager install v0.4.1
 - Binary validation steps
 
 ### Debug Information
-Use `cleanmanager doctor` for comprehensive environment debugging and issue diagnosis.
+Use `cleen doctor` for comprehensive environment debugging and issue diagnosis.

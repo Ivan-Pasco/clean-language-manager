@@ -19,14 +19,14 @@ iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/downloa
 ### 🚀 **NEW: Fully Automated Setup**
 ```bash
 # Automatic shell detection and PATH configuration
-cleanmanager init
+cleen init
 
 # 🔧 Initializing Clean Language Manager
 # 
 # 📁 Clean Language Manager directories:
-#   - Manager directory: "/Users/you/.cleanmanager"
-#   - Binary directory: "/Users/you/.cleanmanager/bin"
-#   - Versions directory: "/Users/you/.cleanmanager/versions"
+#   - Manager directory: "/Users/you/.cleen"
+#   - Binary directory: "/Users/you/.cleen/bin"
+#   - Versions directory: "/Users/you/.cleen/versions"
 #
 # 🛣️  Configuring PATH for Clean Language Manager
 #
@@ -40,20 +40,20 @@ cleanmanager init
 #   1. Restart your terminal, OR
 #   2. Run: source /Users/you/.zshrc
 #
-# Then run 'cleanmanager doctor' to verify your setup.
+# Then run 'cleen doctor' to verify your setup.
 ```
 
 ### Complete Setup
 ```bash
 # Verify everything works
-cleanmanager doctor
+cleen doctor
 
 # List available Clean Language versions from GitHub
-cleanmanager available
+cleen available
 
 # Install and use a version
-cleanmanager install 0.1.2
-cleanmanager use 0.1.2
+cleen install 0.1.2
+cleen use 0.1.2
 
 # Now `cln` command is available!
 cln --version
@@ -63,20 +63,20 @@ cln --version
 
 ### 🚀 **Automated Experience**
 - **One-Line Installation**: Fully automated installation with PATH configuration
-- **Interactive Setup**: Smart shell detection with automatic config file updates (`cleanmanager init`)
+- **Interactive Setup**: Smart shell detection with automatic config file updates (`cleen init`)
 - **Zero Configuration**: Works out-of-the-box with sensible defaults
 - **Professional UX**: Clear guidance, error recovery, and helpful feedback
 
 ### ⚙️ **Version Management**
 - **Multi-version Support**: Install and manage multiple Clean Language compiler versions
-- **Easy Switching**: Switch between versions with simple commands (`cleanmanager use <version>`)
-- **GitHub Integration**: Direct access to official Clean Language releases (`cleanmanager available`)
+- **Easy Switching**: Switch between versions with simple commands (`cleen use <version>`)
+- **GitHub Integration**: Direct access to official Clean Language releases (`cleen available`)
 - **Isolated Installations**: Each version stored separately with automatic routing
 
 ### 🔧 **Platform & Shell Support**
 - **Cross-Platform**: Native support for macOS (Intel & Apple Silicon), Linux, and Windows
 - **Shell Integration**: Supports bash, zsh, and fish with proper syntax and PATH management
-- **Environment Diagnostics**: Built-in health checking and troubleshooting (`cleanmanager doctor`)
+- **Environment Diagnostics**: Built-in health checking and troubleshooting (`cleen doctor`)
 - **Smart Error Handling**: Helpful error messages with recovery suggestions
 
 ## Installation
@@ -96,15 +96,15 @@ iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/downloa
 ### Manual Installation
 
 1. **Download** the appropriate binary for your platform from [Releases](https://github.com/Ivan-Pasco/clean-language-manager/releases/latest):
-   - **Linux (x86_64)**: `cleanmanager-linux-x86_64.tar.gz`
-   - **macOS (Intel)**: `cleanmanager-macos-x86_64.tar.gz`
-   - **macOS (Apple Silicon)**: `cleanmanager-macos-aarch64.tar.gz`
-   - **Windows (x86_64)**: `cleanmanager-windows-x86_64.zip`
+   - **Linux (x86_64)**: `cleen-linux-x86_64.tar.gz`
+   - **macOS (Intel)**: `cleen-macos-x86_64.tar.gz`
+   - **macOS (Apple Silicon)**: `cleen-macos-aarch64.tar.gz`
+   - **Windows (x86_64)**: `cleen-windows-x86_64.zip`
 
 2. **Extract** the archive:
    ```bash
    # Unix/Linux/macOS
-   tar -xzf cleanmanager-*.tar.gz
+   tar -xzf cleen-*.tar.gz
    
    # Windows
    # Extract using Windows Explorer or 7-Zip
@@ -113,16 +113,16 @@ iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/downloa
 3. **Move** the binary to a directory in your PATH:
    ```bash
    # Unix/Linux/macOS
-   sudo mv cleanmanager /usr/local/bin/
+   sudo mv cleen /usr/local/bin/
    
    # Or to user directory
    mkdir -p ~/.local/bin
-   mv cleanmanager ~/.local/bin/
+   mv cleen ~/.local/bin/
    ```
 
 4. **Initialize** the environment:
    ```bash
-   cleanmanager init
+   cleen init
    ```
 
 ### From Source
@@ -131,45 +131,45 @@ iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/downloa
 git clone https://github.com/Ivan-Pasco/clean-language-manager.git
 cd clean-language-manager
 cargo build --release
-cp target/release/cleanmanager ~/.local/bin/  # or your preferred location
+cp target/release/cleen ~/.local/bin/  # or your preferred location
 ```
 
 ## Usage
 
 ### Initial Setup
 ```bash
-# Set up your environment (adds cleanmanager to PATH)
-cleanmanager init
+# Set up your environment (adds cleen to PATH)
+cleen init
 
 # Verify everything is working
-cleanmanager doctor
+cleen doctor
 ```
 
 ### Version Management
 ```bash
 # Install a specific version
-cleanmanager install 1.2.3
+cleen install 1.2.3
 
 # List installed versions
-cleanmanager list
+cleen list
 
 # Switch to a version (makes it active)
-cleanmanager use 1.2.3
+cleen use 1.2.3
 
 # List available versions from GitHub
-cleanmanager available
+cleen available
 
 # Uninstall a version
-cleanmanager uninstall 1.2.3
+cleen uninstall 1.2.3
 ```
 
 ### Getting Help
 ```bash
 # Show help for all commands
-cleanmanager --help
+cleen --help
 
 # Show help for a specific command
-cleanmanager install --help
+cleen install --help
 ```
 
 ## Architecture
@@ -177,7 +177,7 @@ cleanmanager install --help
 The manager organizes versions in isolated directories:
 
 ```
-~/.cleanmanager/
+~/.cleen/
 ├── bin/cln                    # Shim to active version
 ├── versions/
 │   ├── 1.2.3/cln             # Version-specific binaries
@@ -190,27 +190,27 @@ The manager organizes versions in isolated directories:
 Clean Language Manager stores different compiler versions in isolated directories and uses a shim system to route the `cln` command to the currently active version:
 
 1. **Download**: Fetches compiler binaries from GitHub releases
-2. **Install**: Extracts and stores each version in `~/.cleanmanager/versions/<version>/`
-3. **Activate**: Creates a symlink/shim in `~/.cleanmanager/bin/cln` pointing to the active version
+2. **Install**: Extracts and stores each version in `~/.cleen/versions/<version>/`
+3. **Activate**: Creates a symlink/shim in `~/.cleen/bin/cln` pointing to the active version
 4. **Route**: When you run `cln`, it automatically uses the active version
 
 ## Troubleshooting
 
 ### Command Not Found
-If you get `command not found: cleanmanager`:
+If you get `command not found: cleen`:
 1. Make sure the binary is in your PATH: `echo $PATH`
-2. Run `cleanmanager init` to get setup instructions
+2. Run `cleen init` to get setup instructions
 3. Restart your terminal after updating your shell configuration
 
 ### Clean Language Not Working
 If `cln` doesn't work after installation:
-1. Run `cleanmanager doctor` to diagnose issues
-2. Make sure you've activated a version: `cleanmanager use <version>`
-3. Check that `~/.cleanmanager/bin` is in your PATH
+1. Run `cleen doctor` to diagnose issues
+2. Make sure you've activated a version: `cleen use <version>`
+3. Check that `~/.cleen/bin` is in your PATH
 
 ### Permission Issues
 If you get permission errors:
-- On Unix systems, make sure the binary is executable: `chmod +x cleanmanager`
+- On Unix systems, make sure the binary is executable: `chmod +x cleen`
 - On Windows, you may need to run PowerShell as Administrator
 
 ## Development

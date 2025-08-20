@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Clean Language Manager (`cleanmanager`) is a version management tool that allows developers to install, switch between, and manage multiple versions of the Clean Language compiler (`cln`) on their development machines.
+The Clean Language Manager (`cleen`) is a version management tool that allows developers to install, switch between, and manage multiple versions of the Clean Language compiler (`cln`) on their development machines.
 
 ## Core Functionality
 
@@ -12,20 +12,20 @@ The Clean Language Manager (`cleanmanager`) is a version management tool that al
 
 **Behavior**:
 - Downloads platform-appropriate binaries from the official GitHub repository
-- Installs to isolated directories (`~/.cleanmanager/versions/<version>/`)
+- Installs to isolated directories (`~/.cleen/versions/<version>/`)
 - Validates binary integrity and compatibility
 - Sets up executable permissions
 - Updates global version tracking
 
 **Commands**:
-- `cleanmanager install <version>` - Install specific version (e.g., `v0.4.1`)
-- `cleanmanager install latest` - Install the most recent release
+- `cleen install <version>` - Install specific version (e.g., `v0.4.1`)
+- `cleen install latest` - Install the most recent release
 
 **Examples**:
 ```bash
-cleanmanager install v0.4.1
-cleanmanager install latest
-cleanmanager install v0.3.0
+cleen install v0.4.1
+cleen install latest
+cleen install v0.3.0
 ```
 
 ### Version Listing
@@ -43,8 +43,8 @@ cleanmanager install v0.3.0
 - Indicates download sizes and release notes
 
 **Commands**:
-- `cleanmanager list` - Show installed versions
-- `cleanmanager available` - Show available versions from GitHub
+- `cleen list` - Show installed versions
+- `cleen available` - Show available versions from GitHub
 
 ### Version Switching
 
@@ -61,13 +61,13 @@ cleanmanager install v0.3.0
 - Overrides global version when in project directory
 
 **Commands**:
-- `cleanmanager use <version>` - Set global active version
-- `cleanmanager local <version>` - Set project-specific version
+- `cleen use <version>` - Set global active version
+- `cleen local <version>` - Set project-specific version
 
 **Examples**:
 ```bash
-cleanmanager use v0.4.1              # Global switch
-cleanmanager local v0.3.0            # Project-specific version
+cleen use v0.4.1              # Global switch
+cleen local v0.3.0            # Project-specific version
 ```
 
 ### Version Synchronization
@@ -81,7 +81,7 @@ cleanmanager local v0.3.0            # Project-specific version
 - Useful for team environments and CI/CD
 
 **Command**:
-- `cleanmanager sync` - Install and use project-specified version
+- `cleen sync` - Install and use project-specified version
 
 ### Version Uninstallation
 
@@ -94,7 +94,7 @@ cleanmanager local v0.3.0            # Project-specific version
 - Provides confirmation prompts for safety
 
 **Command**:
-- `cleanmanager uninstall <version>` - Remove specific version
+- `cleen uninstall <version>` - Remove specific version
 
 ### Environment Setup
 
@@ -102,7 +102,7 @@ cleanmanager local v0.3.0            # Project-specific version
 
 **Shell Configuration**:
 - Automatically detects current shell (bash, zsh, fish, etc.)
-- Adds `~/.cleanmanager/bin` to PATH
+- Adds `~/.cleen/bin` to PATH
 - Creates or updates shell configuration files
 - Provides manual setup instructions as fallback
 
@@ -112,7 +112,7 @@ cleanmanager local v0.3.0            # Project-specific version
 - Offers to restart shell or source configuration
 
 **Command**:
-- `cleanmanager init` - Set up shell environment
+- `cleen init` - Set up shell environment
 
 ### Environment Diagnostics
 
@@ -132,21 +132,21 @@ cleanmanager local v0.3.0            # Project-specific version
 - Validates fixes after resolution
 
 **Command**:
-- `cleanmanager doctor` - Run environment diagnostics
+- `cleen doctor` - Run environment diagnostics
 
 ## Version Resolution Priority
 
 The manager uses a hierarchical approach to determine which version to use:
 
 1. **Project Version**: `.cleanlanguage/.cleanversion` in current directory or parent directories
-2. **Global Version**: System-wide default version set via `cleanmanager use`
+2. **Global Version**: System-wide default version set via `cleen use`
 3. **Fallback**: Latest installed version if no explicit choice
 
 ## File System Layout
 
 ### User Directory Structure
 ```
-~/.cleanmanager/
+~/.cleen/
 ├── bin/
 │   └── cln                   # Shim that routes to active version
 ├── versions/
@@ -171,14 +171,14 @@ project-root/
 
 ## Configuration Management
 
-### Global Configuration (`~/.cleanmanager/config.json`)
+### Global Configuration (`~/.cleen/config.json`)
 ```json
 {
   "active_version": "v0.4.1",
   "installed_versions": {
     "v0.4.1": {
       "installed_at": "2024-01-15T10:30:00Z",
-      "binary_path": "/Users/user/.cleanmanager/versions/v0.4.1/cln",
+      "binary_path": "/Users/user/.cleen/versions/v0.4.1/cln",
       "platform": "macos-aarch64"
     }
   },

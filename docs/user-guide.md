@@ -18,12 +18,12 @@
 
 3. **Initialize your shell**:
    ```bash
-   cleanmanager init
+   cleen init
    ```
 
 4. **Install the latest Clean Language compiler**:
    ```bash
-   cleanmanager install latest
+   cleen install latest
    ```
 
 5. **Verify installation**:
@@ -33,14 +33,14 @@
 
 ### First Time Setup
 
-After installing cleanmanager, run the initialization command:
+After installing cleen, run the initialization command:
 
 ```bash
-cleanmanager init
+cleen init
 ```
 
 This will:
-- Add `~/.cleanmanager/bin` to your PATH
+- Add `~/.cleen/bin` to your PATH
 - Configure your shell (bash, zsh, fish, etc.)
 - Create necessary directories
 - Set up the shim system
@@ -53,50 +53,50 @@ This will:
 
 **Install the latest version**:
 ```bash
-cleanmanager install latest
+cleen install latest
 ```
 
 **Install a specific version**:
 ```bash
-cleanmanager install v0.4.1
-cleanmanager install v0.3.0
+cleen install v0.4.1
+cleen install v0.3.0
 ```
 
 **See what's available**:
 ```bash
-cleanmanager available
+cleen available
 ```
 
 ### Switching Versions
 
 **Switch globally** (affects all projects):
 ```bash
-cleanmanager use v0.4.1
+cleen use v0.4.1
 ```
 
 **Set project-specific version**:
 ```bash
 cd my-clean-project
-cleanmanager local v0.3.0
+cleen local v0.3.0
 ```
 
 This creates a `.cleanlanguage/.cleanversion` file that should be committed to your repository.
 
 **Check what's installed**:
 ```bash
-cleanmanager list
+cleen list
 ```
 
 ### Managing Versions
 
 **Remove an unused version**:
 ```bash
-cleanmanager uninstall v0.2.0
+cleen uninstall v0.2.0
 ```
 
 **Install version from project config**:
 ```bash
-cleanmanager sync
+cleen sync
 ```
 
 This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
@@ -107,7 +107,7 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 1. **Monitor GitHub releases manually**:
    ```bash
-   cleanmanager available
+   cleen available
    ```
    This shows all available versions from the GitHub repository.
 
@@ -118,14 +118,14 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 3. **Check for updates**:
    ```bash
-   cleanmanager update          # Check for compiler updates
-   cleanmanager self-update     # Check for cleanmanager updates
+   cleen update          # Check for compiler updates
+   cleen self-update     # Check for cleen updates
    ```
 
 4. **Update to latest version**:
    ```bash
-   cleanmanager install latest
-   cleanmanager use latest
+   cleen install latest
+   cleen use latest
    ```
 
 **Best Practices for Updates**:
@@ -147,7 +147,7 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 2. **Set the project version**:
    ```bash
-   cleanmanager local v0.4.1
+   cleen local v0.4.1
    ```
 
 3. **Commit the version file**:
@@ -166,7 +166,7 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 2. **Install and use the project's specified version**:
    ```bash
-   cleanmanager sync
+   cleen sync
    ```
 
 ### Team Collaboration
@@ -175,7 +175,7 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 1. **Use project-specific versions**:
    ```bash
-   cleanmanager local v0.4.1
+   cleen local v0.4.1
    ```
 
 2. **Commit the version file**:
@@ -186,7 +186,7 @@ This reads `.cleanlanguage/.cleanversion` and installs/activates that version.
 
 3. **Team members sync with**:
    ```bash
-   cleanmanager sync
+   cleen sync
    ```
 
 #### CI/CD Integration
@@ -196,7 +196,7 @@ Add to your CI pipeline:
 - name: Install Clean Language
   run: |
     curl -sSL https://install-script-url | bash
-    cleanmanager sync
+    cleen sync
 ```
 
 ### Troubleshooting
@@ -204,7 +204,7 @@ Add to your CI pipeline:
 #### Check Environment
 
 ```bash
-cleanmanager doctor
+cleen doctor
 ```
 
 This comprehensive diagnostic will:
@@ -218,23 +218,23 @@ This comprehensive diagnostic will:
 
 **Command not found: cln**
 ```bash
-# Check if cleanmanager bin is in PATH
-echo $PATH | grep cleanmanager
+# Check if cleen bin is in PATH
+echo $PATH | grep cleen
 
 # If not, re-run init
-cleanmanager init
+cleen init
 
 # Or manually add to PATH
-export PATH="$HOME/.cleanmanager/bin:$PATH"
+export PATH="$HOME/.cleen/bin:$PATH"
 ```
 
 **Permission denied**
 ```bash
 # Check directory permissions
-ls -la ~/.cleanmanager
+ls -la ~/.cleen
 
 # Fix permissions if needed
-chmod -R u+w ~/.cleanmanager
+chmod -R u+w ~/.cleen
 ```
 
 **Download failures**
@@ -243,7 +243,7 @@ chmod -R u+w ~/.cleanmanager
 curl -I https://api.github.com
 
 # Try with verbose logging
-CLEANMANAGER_VERBOSE=1 cleanmanager install v0.4.1
+CLEANMANAGER_VERBOSE=1 cleen install v0.4.1
 ```
 
 **Binary compatibility issues**
@@ -252,11 +252,11 @@ CLEANMANAGER_VERBOSE=1 cleanmanager install v0.4.1
 uname -m
 
 # Verify binary
-file ~/.cleanmanager/versions/v0.4.1/cln
+file ~/.cleen/versions/v0.4.1/cln
 
 # Reinstall if corrupted
-cleanmanager uninstall v0.4.1
-cleanmanager install v0.4.1
+cleen uninstall v0.4.1
+cleen install v0.4.1
 ```
 
 ## Directory Layout
@@ -264,7 +264,7 @@ cleanmanager install v0.4.1
 Understanding the file structure helps with troubleshooting:
 
 ```
-~/.cleanmanager/
+~/.cleen/
 ├── bin/
 │   └── cln                    # Shim that routes to active version
 ├── versions/
@@ -281,7 +281,7 @@ Understanding the file structure helps with troubleshooting:
 
 ### Global Settings
 
-Edit `~/.cleanmanager/config.json` to customize behavior:
+Edit `~/.cleen/config.json` to customize behavior:
 
 ```json
 {
@@ -297,38 +297,38 @@ Edit `~/.cleanmanager/config.json` to customize behavior:
 - `auto_install_on_use`: Automatically install versions when switching to them
 - `check_updates`: Check for newer versions periodically (default: true)
 - `last_update_check`: Timestamp of last compiler update check (Unix timestamp)
-- `last_self_update_check`: Timestamp of last cleanmanager self-update check (Unix timestamp)
+- `last_self_update_check`: Timestamp of last cleen self-update check (Unix timestamp)
 
 **Update Checking Behavior**:
 - Compiler updates: Checked daily (24 hours) if `check_updates` is true
 - Self-updates: Checked weekly (7 days) if `check_updates` is true
-- Automatic checks occur during `cleanmanager list` and other common commands
-- Manual checks available via `cleanmanager update` and `cleanmanager self-update`
+- Automatic checks occur during `cleen list` and other common commands
+- Manual checks available via `cleen update` and `cleen self-update`
 
 ### Environment Variables
 
 **`CLEANMANAGER_HOME`**: Override installation directory
 ```bash
-export CLEANMANAGER_HOME="/opt/cleanmanager"
-cleanmanager install latest
+export CLEANMANAGER_HOME="/opt/cleen"
+cleen install latest
 ```
 
 **`CLEANMANAGER_GITHUB_TOKEN`**: GitHub token for higher rate limits
 ```bash
 export CLEANMANAGER_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
-cleanmanager available
+cleen available
 ```
 
 **`NO_COLOR`**: Disable colored output
 ```bash
 export NO_COLOR=1
-cleanmanager list
+cleen list
 ```
 
 **`CLEANMANAGER_VERBOSE`**: Enable verbose logging
 ```bash
 export CLEANMANAGER_VERBOSE=1
-cleanmanager install v0.4.1
+cleen install v0.4.1
 ```
 
 ## Best Practices
@@ -337,19 +337,19 @@ cleanmanager install v0.4.1
 
 1. **Use project-specific versions for shared projects**:
    ```bash
-   cleanmanager local v0.4.1
+   cleen local v0.4.1
    git add .cleanlanguage/.cleanversion
    ```
 
 2. **Keep global version reasonably current**:
    ```bash
-   cleanmanager use latest
+   cleen use latest
    ```
 
 3. **Regularly clean up old versions**:
    ```bash
-   cleanmanager list
-   cleanmanager uninstall v0.1.0  # Remove old versions
+   cleen list
+   cleen uninstall v0.1.0  # Remove old versions
    ```
 
 ### Development Workflow
@@ -357,20 +357,20 @@ cleanmanager install v0.4.1
 1. **Check project requirements before starting**:
    ```bash
    cat .cleanlanguage/.cleanversion  # Check project version
-   cleanmanager sync                 # Install if needed
+   cleen sync                 # Install if needed
    ```
 
 2. **Verify environment before important work**:
    ```bash
-   cleanmanager doctor
+   cleen doctor
    cln --version
    ```
 
 3. **Test with multiple versions when needed**:
    ```bash
-   cleanmanager use v0.3.0
+   cleen use v0.3.0
    cln build
-   cleanmanager use v0.4.1
+   cleen use v0.4.1
    cln build
    ```
 
@@ -381,40 +381,40 @@ cleanmanager install v0.4.1
 Add these to your shell config for convenience:
 
 ```bash
-alias clm="cleanmanager"
-alias cln-switch="cleanmanager use"
-alias cln-local="cleanmanager local"
-alias cln-sync="cleanmanager sync"
+alias clm="cleen"
+alias cln-switch="cleen use"
+alias cln-local="cleen local"
+alias cln-sync="cleen sync"
 ```
 
 ### Quick Commands
 
 ```bash
 # Install and immediately use latest
-cleanmanager install latest && cleanmanager use latest
+cleen install latest && cleen use latest
 
 # Check status quickly
-cleanmanager list | grep "✅"
+cleen list | grep "✅"
 
 # Install project version if .cleanversion exists
-[ -f .cleanlanguage/.cleanversion ] && cleanmanager sync
+[ -f .cleanlanguage/.cleanversion ] && cleen sync
 ```
 
 ### Scripting
 
-cleanmanager is script-friendly:
+cleen is script-friendly:
 
 ```bash
 #!/bin/bash
 set -e
 
 # Ensure specific version is available
-if ! cleanmanager list | grep -q "v0.4.1"; then
-    cleanmanager install v0.4.1
+if ! cleen list | grep -q "v0.4.1"; then
+    cleen install v0.4.1
 fi
 
 # Use for this script
-cleanmanager use v0.4.1
+cleen use v0.4.1
 
 # Your Clean Language build commands here
 cln build
@@ -427,14 +427,14 @@ cln test
 
 If you were previously managing Clean Language versions manually:
 
-1. **Install cleanmanager**
+1. **Install cleen**
 2. **Run doctor to see what versions are detected**:
    ```bash
-   cleanmanager doctor
+   cleen doctor
    ```
-3. **Install missing versions through cleanmanager**:
+3. **Install missing versions through cleen**:
    ```bash
-   cleanmanager install v0.4.1
+   cleen install v0.4.1
    ```
 4. **Remove old manual installations from PATH**
 
@@ -444,14 +444,14 @@ If you were using a different version manager:
 
 1. **List your current versions** in the old manager
 2. **Uninstall the old manager** (following its documentation)
-3. **Install cleanmanager and set up environment**:
+3. **Install cleen and set up environment**:
    ```bash
-   cleanmanager init
+   cleen init
    ```
 4. **Install needed versions**:
    ```bash
-   cleanmanager install v0.4.1
-   cleanmanager install v0.3.0
+   cleen install v0.4.1
+   cleen install v0.3.0
    ```
 5. **Set appropriate global/project versions**
 
@@ -460,40 +460,40 @@ If you were using a different version manager:
 ### Built-in Help
 
 ```bash
-cleanmanager --help              # General help
-cleanmanager install --help      # Command-specific help
+cleen --help              # General help
+cleen install --help      # Command-specific help
 ```
 
 ### Diagnostics
 
 ```bash
-cleanmanager doctor              # Comprehensive environment check
-CLEANMANAGER_VERBOSE=1 cleanmanager <command>  # Verbose output
+cleen doctor              # Comprehensive environment check
+CLEANMANAGER_VERBOSE=1 cleen <command>  # Verbose output
 ```
 
 ### Common Debugging Steps
 
 1. **Check environment**:
    ```bash
-   cleanmanager doctor
+   cleen doctor
    ```
 
 2. **Verify PATH**:
    ```bash
-   echo $PATH | tr ':' '\n' | grep cleanmanager
+   echo $PATH | tr ':' '\n' | grep cleen
    ```
 
 3. **Check shim**:
    ```bash
-   ls -la ~/.cleanmanager/bin/cln
+   ls -la ~/.cleen/bin/cln
    ```
 
 4. **Test direct binary**:
    ```bash
-   ~/.cleanmanager/versions/v0.4.1/cln --version
+   ~/.cleen/versions/v0.4.1/cln --version
    ```
 
 5. **Verify config**:
    ```bash
-   cat ~/.cleanmanager/config.json
+   cat ~/.cleen/config.json
    ```

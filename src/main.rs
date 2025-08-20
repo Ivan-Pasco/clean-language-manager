@@ -7,7 +7,7 @@ mod error;
 mod utils;
 
 #[derive(Parser)]
-#[clap(name = "cleanmanager")]
+#[clap(name = "cleen")]
 #[clap(about = "Clean Language version manager")]
 #[clap(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
@@ -49,7 +49,7 @@ enum Commands {
     Doctor,
     /// Check for Clean Language compiler updates
     Update,
-    /// Update cleanmanager itself to the latest version
+    /// Update cleen itself to the latest version
     SelfUpdate,
 }
 

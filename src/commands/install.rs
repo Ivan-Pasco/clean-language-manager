@@ -113,7 +113,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("Found asset: {}", asset.name);
 
     // Create temporary download directory
-    let temp_dir = std::env::temp_dir().join(format!("cleanmanager-{actual_version}"));
+    let temp_dir = std::env::temp_dir().join(format!("cleen-{actual_version}"));
     std::fs::create_dir_all(&temp_dir)?;
 
     // Download the asset
@@ -171,7 +171,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("   Binary location: {binary_path:?}");
     println!();
     println!("To use this version, run:");
-    println!("   cleanmanager use {actual_version}");
+    println!("   cleen use {actual_version}");
 
     Ok(())
 }
@@ -212,8 +212,8 @@ fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Resu
 
     // Create a temporary test file
     let temp_dir = std::env::temp_dir();
-    let test_file = temp_dir.join("cleanmanager_test.cln");
-    let test_wasm = temp_dir.join("cleanmanager_test.wasm");
+    let test_file = temp_dir.join("cleen_test.cln");
+    let test_wasm = temp_dir.join("cleen_test.wasm");
 
     // Write test program
     if let Err(e) = std::fs::write(&test_file, test_program) {

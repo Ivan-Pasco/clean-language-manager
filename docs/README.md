@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains comprehensive documentation for the Clean Language Manager (`cleanmanager`), a Rust-based version manager for the Clean Language compiler.
+This directory contains comprehensive documentation for the Clean Language Manager (`cleen`), a Rust-based version manager for the Clean Language compiler.
 
 ## Documentation Structure
 
@@ -62,7 +62,7 @@ Practical usage guide for developers including:
 The manager handles multiple compiler versions in isolated directories, allowing seamless switching between versions for different projects.
 
 ### Shim System
-A lightweight proxy (`~/.cleanmanager/bin/cln`) that routes `cln` commands to the appropriate version based on global and project-specific settings.
+A lightweight proxy (`~/.cleen/bin/cln`) that routes `cln` commands to the appropriate version based on global and project-specific settings.
 
 ### Project Integration
 Project-specific versions are managed via `.cleanlanguage/.cleanversion` files that override global settings within project directories.

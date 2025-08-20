@@ -1,14 +1,14 @@
 # Clean Language Manager Installer for Windows
-# This script downloads and installs the latest version of cleanmanager
+# This script downloads and installs the latest version of cleen
 
 param(
-    [string]$InstallDir = "$env:LOCALAPPDATA\cleanmanager\bin",
+    [string]$InstallDir = "$env:LOCALAPPDATA\cleen\bin",
     [string]$Repo = "Ivan-Pasco/clean-language-manager"  # Update this to actual repo
 )
 
 # Configuration
-$BinaryName = "cleanmanager.exe"
-$ArchiveName = "cleanmanager-windows-x86_64.zip"
+$BinaryName = "cleen.exe"
+$ArchiveName = "cleen-windows-x86_64.zip"
 
 Write-Host "Clean Language Manager Installer" -ForegroundColor Blue
 Write-Host "=================================" -ForegroundColor Blue
@@ -71,7 +71,7 @@ function Install-CleanManager {
     $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
     
     try {
-        Write-Host "Downloading cleanmanager..." -ForegroundColor Yellow
+        Write-Host "Downloading cleen..." -ForegroundColor Yellow
         Write-Host "URL: $downloadUrl"
         
         $archivePath = Join-Path $tempDir.FullName $ArchiveName
@@ -108,37 +108,37 @@ function Install-CleanManager {
                 Write-Host ""
                 Write-Host "✅ PATH configured successfully!" -ForegroundColor Green
                 Write-Host ""
-                Write-Host "To use cleanmanager immediately:" -ForegroundColor Yellow
+                Write-Host "To use cleen immediately:" -ForegroundColor Yellow
                 Write-Host "  - Restart your PowerShell/Terminal" -ForegroundColor Blue
                 Write-Host "  - Or run: refreshenv (if you have Chocolatey)" -ForegroundColor Blue
                 Write-Host ""
-                Write-Host "You can also run cleanmanager directly:" -ForegroundColor Yellow
-                Write-Host "  $InstallDir\cleanmanager.exe --help" -ForegroundColor Blue
+                Write-Host "You can also run cleen directly:" -ForegroundColor Yellow
+                Write-Host "  $InstallDir\cleen.exe --help" -ForegroundColor Blue
             }
             else {
                 Write-Host "Failed to configure PATH automatically" -ForegroundColor Red
                 Write-Host ""
-                Write-Host "To add cleanmanager to your PATH manually:"
+                Write-Host "To add cleen to your PATH manually:"
                 Write-Host "1. Open PowerShell as Administrator"
                 Write-Host "2. Run: [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$InstallDir', 'User')" -ForegroundColor Blue
                 Write-Host "3. Restart your terminal"
                 Write-Host ""
-                Write-Host "Alternatively, run cleanmanager directly:"
-                Write-Host "  $InstallDir\cleanmanager.exe --help" -ForegroundColor Blue
+                Write-Host "Alternatively, run cleen directly:"
+                Write-Host "  $InstallDir\cleen.exe --help" -ForegroundColor Blue
             }
         }
         else {
             Write-Host "✅ Installation directory is already in your PATH" -ForegroundColor Green
             Write-Host ""
             Write-Host "You can now run:"
-            Write-Host "  cleanmanager --help" -ForegroundColor Blue
+            Write-Host "  cleen --help" -ForegroundColor Blue
         }
         
         Write-Host ""
         Write-Host "Next steps:" -ForegroundColor Blue
-        Write-Host "1. Run: " -NoNewline; Write-Host "cleanmanager init" -ForegroundColor Blue
-        Write-Host "2. Run: " -NoNewline; Write-Host "cleanmanager doctor" -ForegroundColor Blue
-        Write-Host "3. Install a Clean Language version: " -NoNewline; Write-Host "cleanmanager install <version>" -ForegroundColor Blue
+        Write-Host "1. Run: " -NoNewline; Write-Host "cleen init" -ForegroundColor Blue
+        Write-Host "2. Run: " -NoNewline; Write-Host "cleen doctor" -ForegroundColor Blue
+        Write-Host "3. Install a Clean Language version: " -NoNewline; Write-Host "cleen install <version>" -ForegroundColor Blue
         Write-Host ""
         Write-Host "For more information: " -NoNewline; Write-Host "https://github.com/$Repo" -ForegroundColor Blue
     }

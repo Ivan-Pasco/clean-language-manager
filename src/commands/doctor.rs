@@ -13,12 +13,12 @@ pub fn check_environment() -> Result<()> {
 
     let mut issues_found = 0;
 
-    // Check cleanmanager directories
+    // Check cleen directories
     println!("📁 Directory Structure:");
-    let cleanmanager_dir = &config.cleanmanager_dir;
-    println!("  cleanmanager directory: {cleanmanager_dir:?}");
+    let cleen_dir = &config.cleen_dir;
+    println!("  cleen directory: {cleen_dir:?}");
 
-    if cleanmanager_dir.exists() {
+    if cleen_dir.exists() {
         println!("    ✅ exists");
     } else {
         println!("    ❌ missing");
@@ -82,7 +82,7 @@ pub fn check_environment() -> Result<()> {
                 println!("    ✅ Project version is installed");
             } else {
                 println!(
-                    "    ❌ Project version not installed - run 'cleanmanager install {project_version}'"
+                    "    ❌ Project version not installed - run 'cleen install {project_version}'"
                 );
                 issues_found += 1;
             }
@@ -135,10 +135,10 @@ pub fn check_environment() -> Result<()> {
     let bin_dir_str = bin_dir_binding.to_string_lossy();
     if let Ok(path) = std::env::var("PATH") {
         if path.contains(&*bin_dir_str) {
-            println!("    ✅ cleanmanager bin directory is in PATH");
+            println!("    ✅ cleen bin directory is in PATH");
         } else {
-            println!("    ❌ cleanmanager bin directory not in PATH");
-            println!("      Run 'cleanmanager init' to fix this");
+            println!("    ❌ cleen bin directory not in PATH");
+            println!("      Run 'cleen init' to fix this");
             issues_found += 1;
         }
     } else {
@@ -196,17 +196,17 @@ pub fn check_environment() -> Result<()> {
             println!();
             println!("💡 Project Setup Tips:");
             println!("  - You're using a global Clean Language version");
-            println!("  - Run 'cleanmanager local <version>' to set a project-specific version");
+            println!("  - Run 'cleen local <version>' to set a project-specific version");
             println!("  - This creates a .cleanlanguage/.cleanversion file for the project");
         }
     } else {
         println!("⚠️  Found {issues_found} issue(s) that need attention.");
         println!();
         println!("💡 To fix issues:");
-        println!("  - Run 'cleanmanager init' to set up shell configuration");
-        println!("  - Run 'cleanmanager install <version>' to install a version");
-        println!("  - Run 'cleanmanager use <version>' to set global version");
-        println!("  - Run 'cleanmanager local <version>' to set project version");
+        println!("  - Run 'cleen init' to set up shell configuration");
+        println!("  - Run 'cleen install <version>' to install a version");
+        println!("  - Run 'cleen use <version>' to set global version");
+        println!("  - Run 'cleen local <version>' to set project version");
     }
 
     Ok(())
@@ -219,7 +219,7 @@ fn test_runtime_execution() -> Result<()> {
 
     // Create temporary files
     let temp_dir = std::env::temp_dir();
-    let test_file = temp_dir.join("cleanmanager_runtime_test.cln");
+    let test_file = temp_dir.join("cleen_runtime_test.cln");
 
     // Write test program
     std::fs::write(&test_file, test_program).map_err(|e| CleanManagerError::ValidationError {

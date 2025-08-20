@@ -24,26 +24,26 @@ jobs:
           # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            binary_name: cleanmanager
-            archive_name: cleanmanager-linux-x86_64.tar.gz
+            binary_name: cleen
+            archive_name: cleen-linux-x86_64.tar.gz
           
           # macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
-            binary_name: cleanmanager
-            archive_name: cleanmanager-macos-x86_64.tar.gz
+            binary_name: cleen
+            archive_name: cleen-macos-x86_64.tar.gz
           
           # macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
-            binary_name: cleanmanager
-            archive_name: cleanmanager-macos-aarch64.tar.gz
+            binary_name: cleen
+            archive_name: cleen-macos-aarch64.tar.gz
           
           # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            binary_name: cleanmanager.exe
-            archive_name: cleanmanager-windows-x86_64.zip
+            binary_name: cleen.exe
+            archive_name: cleen-windows-x86_64.zip
 
     steps:
     - uses: actions/checkout@v4
@@ -142,21 +142,21 @@ jobs:
           1. Download the appropriate binary for your platform
           2. Extract the archive
           3. Move the binary to a directory in your PATH
-          4. Run `cleanmanager init` to set up your environment
+          4. Run `cleen init` to set up your environment
           
           ### Platform Downloads
-          - **Linux (x86_64)**: cleanmanager-linux-x86_64.tar.gz
-          - **macOS (Intel)**: cleanmanager-macos-x86_64.tar.gz  
-          - **macOS (Apple Silicon)**: cleanmanager-macos-aarch64.tar.gz
-          - **Windows (x86_64)**: cleanmanager-windows-x86_64.zip
+          - **Linux (x86_64)**: cleen-linux-x86_64.tar.gz
+          - **macOS (Intel)**: cleen-macos-x86_64.tar.gz  
+          - **macOS (Apple Silicon)**: cleen-macos-aarch64.tar.gz
+          - **Windows (x86_64)**: cleen-windows-x86_64.zip
           
           ### Usage
           ```bash
-          cleanmanager init                    # Set up environment
-          cleanmanager install 1.2.3         # Install a version
-          cleanmanager use 1.2.3             # Switch to a version
-          cleanmanager list                   # List installed versions
-          cleanmanager doctor                 # Check environment
+          cleen init                    # Set up environment
+          cleen install 1.2.3         # Install a version
+          cleen use 1.2.3             # Switch to a version
+          cleen list                   # List installed versions
+          cleen doctor                 # Check environment
           ```
           
           For more information, see the [README](https://github.com/${{ github.repository }}/blob/main/README.md).

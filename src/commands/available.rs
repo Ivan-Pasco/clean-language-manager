@@ -42,15 +42,15 @@ pub fn list_available_versions() -> Result<()> {
 
                 println!();
                 println!("🔧 To install a version, run:");
-                println!("  cleanmanager install <version>");
-                println!("  cleanmanager install latest");
+                println!("  cleen install <version>");
+                println!("  cleen install latest");
                 println!();
 
                 println!("💡 Examples:");
                 if let Some(latest) = releases.first() {
-                    println!("  cleanmanager install {}", latest.tag_name);
+                    println!("  cleen install {}", latest.tag_name);
                 }
-                println!("  cleanmanager install latest");
+                println!("  cleen install latest");
             }
         }
         Err(e) => {
@@ -64,8 +64,8 @@ pub fn list_available_versions() -> Result<()> {
             println!("   🌐 https://github.com/Ivan-Pasco/clean-language-compiler/releases");
             println!();
             println!("🔧 Once you find a version you want, install it with:");
-            println!("  cleanmanager install <version>");
-            println!("  cleanmanager install latest");
+            println!("  cleen install <version>");
+            println!("  cleen install latest");
         }
     }
 

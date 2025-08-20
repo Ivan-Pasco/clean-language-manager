@@ -12,7 +12,7 @@ pub fn init_shell() -> Result<()> {
     let bin_dir_str = bin_dir.to_string_lossy();
 
     println!("📁 Clean Language Manager directories:");
-    println!("  - Manager directory: {:?}", config.cleanmanager_dir);
+    println!("  - Manager directory: {:?}", config.cleen_dir);
     println!("  - Binary directory: {bin_dir:?}");
     println!("  - Versions directory: {:?}", config.get_versions_dir());
     println!();
@@ -22,7 +22,7 @@ pub fn init_shell() -> Result<()> {
         println!("✅ PATH is already configured correctly!");
         println!();
         println!("Clean Language Manager is ready to use.");
-        println!("Run 'cleanmanager doctor' to verify your setup.");
+        println!("Run 'cleen doctor' to verify your setup.");
         return Ok(());
     }
 
@@ -55,7 +55,7 @@ pub fn init_shell() -> Result<()> {
                 println!("  1. Restart your terminal, OR");
                 println!("  2. Run: {}", shell::get_reload_instructions());
                 println!();
-                println!("Then run 'cleanmanager doctor' to verify your setup.");
+                println!("Then run 'cleen doctor' to verify your setup.");
             }
             Err(e) => {
                 println!("❌ Automatic configuration failed: {e}");
@@ -100,8 +100,8 @@ fn show_manual_instructions(bin_dir: &str, shell: &str, config_file: &str) {
         "  2. Restart your terminal or run: {}",
         shell::get_reload_instructions()
     );
-    println!("  3. Run 'cleanmanager doctor' to verify setup");
-    println!("  4. Install a Clean Language version: cleanmanager install <version>");
+    println!("  3. Run 'cleen doctor' to verify setup");
+    println!("  4. Install a Clean Language version: cleen install <version>");
     println!();
     println!("💡 Tip: You can also temporarily add to PATH by running:");
     println!("  {export_line}");

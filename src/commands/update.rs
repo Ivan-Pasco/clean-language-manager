@@ -3,13 +3,13 @@ use crate::error::Result;
 use std::env;
 
 pub fn update_self() -> Result<()> {
-    println!("🔄 Checking for cleanmanager updates...");
+    println!("🔄 Checking for cleen updates...");
 
     let github = GitHubClient::new(None);
     let releases = github.get_releases("Ivan-Pasco", "clean-language-manager")?;
 
     if releases.is_empty() {
-        println!("❌ No releases found for cleanmanager");
+        println!("❌ No releases found for cleen");
         return Ok(());
     }
 
@@ -17,7 +17,7 @@ pub fn update_self() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
 
     if latest_release.tag_name.trim_start_matches('v') == current_version {
-        println!("✅ cleanmanager is up to date (version {current_version})");
+        println!("✅ cleen is up to date (version {current_version})");
 
         let mut config = Config::load()?;
         config.update_last_self_check_time()?;
@@ -30,7 +30,7 @@ pub fn update_self() -> Result<()> {
         latest_release.tag_name, current_version
     );
     println!();
-    println!("To update cleanmanager:");
+    println!("To update cleen:");
     println!("  1. Visit: https://github.com/Ivan-Pasco/clean-language-manager/releases/latest");
     println!("  2. Or use the install script:");
 
@@ -78,8 +78,8 @@ pub fn check_for_updates() -> Result<()> {
                 );
                 println!();
                 println!("To update:");
-                println!("  cleanmanager install latest");
-                println!("  cleanmanager use latest");
+                println!("  cleen install latest");
+                println!("  cleen use latest");
             }
         }
         None => {
@@ -87,8 +87,8 @@ pub fn check_for_updates() -> Result<()> {
             println!("Latest available: {}", latest_release.tag_name);
             println!();
             println!("To install:");
-            println!("  cleanmanager install latest");
-            println!("  cleanmanager use latest");
+            println!("  cleen install latest");
+            println!("  cleen use latest");
         }
     }
 
