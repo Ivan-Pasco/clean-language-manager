@@ -9,7 +9,7 @@ mod utils;
 #[derive(Parser)]
 #[clap(name = "cleanmanager")]
 #[clap(about = "Clean Language version manager")]
-#[clap(version = "0.1.6")]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[clap(subcommand)]
     command: Commands,
