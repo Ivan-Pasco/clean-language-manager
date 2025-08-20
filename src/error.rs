@@ -49,6 +49,9 @@ pub enum CleanManagerError {
 
     #[error("Environment setup error: {message}")]
     EnvironmentError { message: String },
+
+    #[error("Binary validation error: {message}")]
+    ValidationError { message: String },
 }
 
 impl From<anyhow::Error> for CleanManagerError {

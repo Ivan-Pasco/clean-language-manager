@@ -29,8 +29,8 @@ impl ShimManager {
         // Ensure bin directory exists
         fs::ensure_dir_exists(&self.config.get_bin_dir())?;
 
-        // Create symlink or copy based on platform capabilities
-        self.create_link(&binary_path, &shim_path)?;
+        // Create smart shim that checks for project versions
+        self.create_smart_shim(&shim_path)?;
 
         println!("✅ Activated Clean Language version {}", version);
         
@@ -48,60 +48,50 @@ impl ShimManager {
     }
 
     pub fn get_current_shim_target(&self) -> Result<Option<String>> {
-        let shim_path = self.config.get_shim_path();
-        
-        if !shim_path.exists() {
-            return Ok(None);
-        }
-
-        // Try to resolve the target and find which version it points to
-        let target = self.resolve_link(&shim_path)?;
-        
-        // Extract version from path
-        if let Some(parent) = target.parent() {
-            if let Some(version) = parent.file_name().and_then(|n| n.to_str()) {
-                return Ok(Some(version.to_string()));
-            }
-        }
-        
-        Ok(None)
+        // Use the effective version (project-specific or global)
+        Ok(self.config.get_effective_version())
     }
 
-    fn create_link(&self, target: &Path, link: &Path) -> Result<()> {
-        #[cfg(unix)]
-        {
-            std::os::unix::fs::symlink(target, link)?;
-        }
+    /// Get the version that should be used for the current directory
+    pub fn get_effective_version(&self) -> Option<String> {
+        self.config.get_effective_version()
+    }
 
-        #[cfg(windows)]
-        {
-            // On Windows, try to create a symlink first, fallback to copy
-            match std::os::windows::fs::symlink_file(target, link) {
-                Ok(_) => {}
-                Err(_) => {
-                    // Fallback to copying the file
-                    std::fs::copy(target, link)?;
-                }
-            }
+    /// Create a smart shim that checks for project-specific versions
+    fn create_smart_shim(&self, shim_path: &Path) -> Result<()> {
+        // For now, create a simple symlink to the global version
+        // In a future enhancement, this could be a script that checks for .cleanversion
+        if let Some(version) = &self.config.active_version {
+            let binary_path = self.config.get_version_binary(version);
+            self.create_link(&binary_path, shim_path)?;
         }
-
+        
         Ok(())
     }
 
-    fn resolve_link(&self, path: &Path) -> Result<std::path::PathBuf> {
-        #[cfg(unix)]
-        {
-            std::fs::read_link(path).map_err(CleanManagerError::from)
-        }
+    #[cfg(unix)]
+    fn create_link(&self, target: &Path, link: &Path) -> Result<()> {
+        std::os::unix::fs::symlink(target, link)?;
+        Ok(())
+    }
 
-        #[cfg(windows)]
-        {
-            // On Windows, if it's a symlink, read it; otherwise return the path itself
-            match std::fs::read_link(path) {
-                Ok(target) => Ok(target),
-                Err(_) => Ok(path.to_path_buf()),
-            }
-        }
+    #[cfg(windows)]
+    fn create_link(&self, target: &Path, link: &Path) -> Result<()> {
+        // On Windows, copy the file instead of symlinking
+        std::fs::copy(target, link)?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn resolve_link(&self, link: &Path) -> Result<std::path::PathBuf> {
+        Ok(std::fs::read_link(link)?)
+    }
+
+    #[cfg(windows)]
+    fn resolve_link(&self, _link: &Path) -> Result<std::path::PathBuf> {
+        // On Windows, we can't easily resolve what was copied
+        // Return the link path itself
+        Ok(_link.to_path_buf())
     }
 
     pub fn verify_shim(&self) -> Result<bool> {

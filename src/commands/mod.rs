@@ -1,7 +1,9 @@
+pub mod available;
+pub mod doctor;
+pub mod init;
 pub mod install;
 pub mod list;
-pub mod available;
-pub mod use_version;
+pub mod local;
+pub mod sync;
 pub mod uninstall;
-pub mod init;
-pub mod doctor;
+pub mod use_version;

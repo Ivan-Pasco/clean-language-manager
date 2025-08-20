@@ -116,16 +116,17 @@ pub fn install_version(version: &str) -> Result<()> {
     let temp_dir = std::env::temp_dir().join(format!("cleanmanager-{}", actual_version));
     std::fs::create_dir_all(&temp_dir)?;
     
-    // Download asset
+    // Download the asset
     let download_path = temp_dir.join(&asset.name);
-    github_client.download_asset(asset, &download_path).map_err(|e| CleanManagerError::DownloadError { url: asset.browser_download_url.clone() })?;
+    println!("Downloading {}...", asset.name);
+    downloader.download_file(&asset.browser_download_url, &download_path).map_err(|_e| CleanManagerError::DownloadError { url: asset.browser_download_url.clone() })?;
     
     // Extract to version directory
     std::fs::create_dir_all(&version_dir)?;
     
     if asset.name.ends_with(".tar.gz") || asset.name.ends_with(".zip") {
         println!("Extracting archive...");
-        downloader.extract_archive(&download_path, &version_dir).map_err(|e| CleanManagerError::ExtractionError { path: download_path.clone() })?;
+        downloader.extract_archive(&download_path, &version_dir).map_err(|_e| CleanManagerError::ExtractionError { path: download_path.clone() })?;
     } else {
         // Assume it's a direct binary
         let binary_name = if cfg!(windows) { "cln.exe" } else { "cln" };
@@ -147,11 +148,90 @@ pub fn install_version(version: &str) -> Result<()> {
     // Clean up temporary files
     std::fs::remove_dir_all(&temp_dir)?;
     
+    // Validate the installed binary works correctly
+    print!("🔍 Validating installation...");
+    if let Err(e) = validate_installed_binary(&binary_path) {
+        println!();
+        eprintln!("⚠️  Warning: Installed binary may have issues: {}", e);
+        eprintln!("   The binary was installed but may not function correctly.");
+        eprintln!("   You may need to use a different version or compile from source.");
+    } else {
+        println!(" ✅");
+    }
+    
     println!("✅ Successfully installed Clean Language version {}", actual_version);
     println!("   Binary location: {:?}", binary_path);
     println!();
     println!("To use this version, run:");
     println!("   cleanmanager use {}", actual_version);
+    
+    Ok(())
+}
+
+fn validate_installed_binary(binary_path: &std::path::Path) -> std::result::Result<(), String> {
+    use std::process::Command;
+    
+    // Test 1: Check if binary exists and is executable
+    if !binary_path.exists() {
+        return Err("Binary file does not exist".to_string());
+    }
+    
+    // Test 2: Check if binary can show version (basic execution test)
+    let version_output = Command::new(binary_path)
+        .args(&["version"])
+        .output();
+    
+    match version_output {
+        Ok(output) => {
+            if !output.status.success() {
+                return Err(format!("Binary failed to execute: exit code {}", 
+                    output.status.code().unwrap_or(-1)));
+            }
+            
+            let version_text = String::from_utf8_lossy(&output.stdout);
+            if !version_text.contains("Clean Language Compiler") {
+                return Err("Binary does not appear to be Clean Language compiler".to_string());
+            }
+        }
+        Err(e) => {
+            return Err(format!("Failed to execute binary: {}", e));
+        }
+    }
+    
+    // Test 3: Try to compile a simple test program
+    let test_program = r#"start()
+	print("test")"#;
+    
+    // Create a temporary test file
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join("cleanmanager_test.cln");
+    let test_wasm = temp_dir.join("cleanmanager_test.wasm");
+    
+    // Write test program
+    if let Err(e) = std::fs::write(&test_file, test_program) {
+        return Err(format!("Failed to create test file: {}", e));
+    }
+    
+    // Try to compile
+    let compile_result = Command::new(binary_path)
+        .args(&["compile", test_file.to_str().unwrap(), test_wasm.to_str().unwrap()])
+        .output();
+    
+    // Clean up test files
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(&test_wasm);
+    
+    match compile_result {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Compilation test failed: {}", stderr));
+            }
+        }
+        Err(e) => {
+            return Err(format!("Failed to run compilation test: {}", e));
+        }
+    }
     
     Ok(())
 }
