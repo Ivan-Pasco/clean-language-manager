@@ -19,22 +19,18 @@ pub struct Asset {
 }
 
 pub struct GitHubClient {
-    repo_owner: String,
-    repo_name: String,
+    github_token: Option<String>,
 }
 
 impl GitHubClient {
-    pub fn new() -> Self {
-        Self {
-            repo_owner: "Ivan-Pasco".to_string(),
-            repo_name: "clean-language-compiler".to_string(),
-        }
+    pub fn new(github_token: Option<String>) -> Self {
+        Self { github_token }
     }
 
-    pub fn get_releases(&self) -> Result<Vec<Release>> {
+    pub fn get_releases(&self, repo_owner: &str, repo_name: &str) -> Result<Vec<Release>> {
         let url = format!(
             "https://api.github.com/repos/{}/{}/releases",
-            self.repo_owner, self.repo_name
+            repo_owner, repo_name
         );
 
         let output = Command::new("curl")
@@ -56,10 +52,10 @@ impl GitHubClient {
         Ok(releases)
     }
 
-    pub fn get_latest_release(&self) -> Result<Release> {
+    pub fn get_latest_release(&self, repo_owner: &str, repo_name: &str) -> Result<Release> {
         let url = format!(
             "https://api.github.com/repos/{}/{}/releases/latest",
-            self.repo_owner, self.repo_name
+            repo_owner, repo_name
         );
 
         let output = Command::new("curl")

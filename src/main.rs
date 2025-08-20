@@ -47,6 +47,10 @@ enum Commands {
     Init,
     /// Check and repair environment setup
     Doctor,
+    /// Check for Clean Language compiler updates
+    Update,
+    /// Update cleanmanager itself to the latest version
+    SelfUpdate,
 }
 
 fn main() -> Result<()> {
@@ -79,6 +83,12 @@ fn main() -> Result<()> {
         }
         Commands::Doctor => {
             commands::doctor::check_environment().map_err(|e| anyhow::anyhow!(e))
+        }
+        Commands::Update => {
+            commands::update::check_for_updates().map_err(|e| anyhow::anyhow!(e))
+        }
+        Commands::SelfUpdate => {
+            commands::update::update_self().map_err(|e| anyhow::anyhow!(e))
         }
     };
 

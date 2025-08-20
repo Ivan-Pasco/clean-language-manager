@@ -10,6 +10,14 @@ pub struct Config {
     pub cleanmanager_dir: PathBuf,
     pub auto_cleanup: bool,
     pub github_api_token: Option<String>,
+    #[serde(default = "default_true")]
+    pub check_updates: bool,
+    pub last_update_check: Option<String>,
+    pub last_self_update_check: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Config {
@@ -22,6 +30,9 @@ impl Default for Config {
             cleanmanager_dir,
             auto_cleanup: false,
             github_api_token: None,
+            check_updates: true,
+            last_update_check: None,
+            last_self_update_check: None,
         }
     }
 }
@@ -35,6 +46,9 @@ impl Config {
             cleanmanager_dir,
             auto_cleanup: false,
             github_api_token: std::env::var("GITHUB_TOKEN").ok(),
+            check_updates: true,
+            last_update_check: None,
+            last_self_update_check: None,
         })
     }
 
@@ -163,6 +177,72 @@ impl Config {
     pub fn get_shim_path(&self) -> PathBuf {
         let binary_name = if cfg!(windows) { "cln.exe" } else { "cln" };
         self.get_bin_dir().join(binary_name)
+    }
+
+    pub fn should_check_updates(&self) -> bool {
+        if !self.check_updates {
+            return false;
+        }
+        
+        match &self.last_update_check {
+            None => true,
+            Some(last_check) => {
+                if let Ok(last_time) = last_check.parse::<i64>() {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64;
+                    
+                    (now - last_time) > 86400
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    pub fn update_last_check_time(&mut self) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
+        
+        self.last_update_check = Some(now);
+        self.save()
+    }
+
+    pub fn should_check_self_updates(&self) -> bool {
+        if !self.check_updates {
+            return false;
+        }
+        
+        match &self.last_self_update_check {
+            None => true,
+            Some(last_check) => {
+                if let Ok(last_time) = last_check.parse::<i64>() {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64;
+                    
+                    (now - last_time) > 604800
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    pub fn update_last_self_check_time(&mut self) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
+        
+        self.last_self_update_check = Some(now);
+        self.save()
     }
 }
 

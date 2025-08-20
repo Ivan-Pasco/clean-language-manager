@@ -6,4 +6,5 @@ pub mod list;
 pub mod local;
 pub mod sync;
 pub mod uninstall;
+pub mod update;
 pub mod use_version;

@@ -1,4 +1,5 @@
 use crate::core::{config::Config, version::VersionManager};
+use crate::commands::update;
 use crate::error::Result;
 
 pub fn list_versions() -> Result<()> {
@@ -41,6 +42,8 @@ pub fn list_versions() -> Result<()> {
     } else {
         println!("No active version set. Use 'cleanmanager use <version>' to activate a version.");
     }
+    
+    let _ = update::check_updates_if_needed();
     
     Ok(())
 }

@@ -6,9 +6,9 @@ pub fn list_available_versions() -> Result<()> {
     println!("=================================");
     println!();
     
-    let github_client = GitHubClient::new();
+    let github_client = GitHubClient::new(None);
     
-    match github_client.get_releases() {
+    match github_client.get_releases("Ivan-Pasco", "clean-language-compiler") {
         Ok(releases) => {
             if releases.is_empty() {
                 println!("🛠️  No releases are available yet.");

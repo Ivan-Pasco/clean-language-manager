@@ -6,7 +6,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("Installing Clean Language version: {}", version);
     
     let config = Config::load()?;
-    let github_client = GitHubClient::new();
+    let github_client = GitHubClient::new(config.github_api_token.clone());
     let downloader = Downloader::new();
     
     // Check if version is already installed
@@ -20,7 +20,7 @@ pub fn install_version(version: &str) -> Result<()> {
     // Resolve version (handle "latest")
     let actual_version = if version == "latest" {
         println!("Fetching latest release...");
-        match github_client.get_latest_release() {
+        match github_client.get_latest_release("Ivan-Pasco", "clean-language-compiler") {
             Ok(release) => {
                 println!("Latest version: {}", release.tag_name);
                 release.tag_name
@@ -41,7 +41,7 @@ pub fn install_version(version: &str) -> Result<()> {
     
     // Get releases and find the specified version
     println!("Fetching available releases...");
-    let releases = match github_client.get_releases() {
+    let releases = match github_client.get_releases("Ivan-Pasco", "clean-language-compiler") {
         Ok(releases) => releases,
         Err(e) => {
             println!("⚠️  Unable to fetch releases from GitHub: {}", e);
