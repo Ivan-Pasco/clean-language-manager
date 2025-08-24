@@ -243,7 +243,7 @@ chmod -R u+w ~/.cleen
 curl -I https://api.github.com
 
 # Try with verbose logging
-CLEANMANAGER_VERBOSE=1 cleen install v0.4.1
+CLEEN_VERBOSE=1 cleen install v0.4.1
 ```
 
 **Binary compatibility issues**
@@ -307,15 +307,15 @@ Edit `~/.cleen/config.json` to customize behavior:
 
 ### Environment Variables
 
-**`CLEANMANAGER_HOME`**: Override installation directory
+**`CLEEN_HOME`**: Override installation directory
 ```bash
-export CLEANMANAGER_HOME="/opt/cleen"
+export CLEEN_HOME="/opt/cleen"
 cleen install latest
 ```
 
-**`CLEANMANAGER_GITHUB_TOKEN`**: GitHub token for higher rate limits
+**`CLEEN_GITHUB_TOKEN`**: GitHub token for higher rate limits
 ```bash
-export CLEANMANAGER_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+export CLEEN_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 cleen available
 ```
 
@@ -325,9 +325,9 @@ export NO_COLOR=1
 cleen list
 ```
 
-**`CLEANMANAGER_VERBOSE`**: Enable verbose logging
+**`CLEEN_VERBOSE`**: Enable verbose logging
 ```bash
-export CLEANMANAGER_VERBOSE=1
+export CLEEN_VERBOSE=1
 cleen install v0.4.1
 ```
 
@@ -468,7 +468,7 @@ cleen install --help      # Command-specific help
 
 ```bash
 cleen doctor              # Comprehensive environment check
-CLEANMANAGER_VERBOSE=1 cleen <command>  # Verbose output
+CLEEN_VERBOSE=1 cleen <command>  # Verbose output
 ```
 
 ### Common Debugging Steps

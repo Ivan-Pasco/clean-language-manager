@@ -19,21 +19,21 @@
 ## 🟡 MEDIUM-HIGH - Essential Commands
 
 ### Basic Commands
-- [ ] **`cleanmanager install <version>`** - Download and install specific version
-- [x] **`cleanmanager list`** - Show installed versions with active indicator ✅ COMPLETED
-- [ ] **`cleanmanager available`** - List available versions from GitHub
-- [x] **`cleanmanager use <version>`** - Switch to specific version ✅ COMPLETED
-- [ ] **`cleanmanager uninstall <version>`** - Remove installed version
+- [ ] **`cleen install <version>`** - Download and install specific version
+- [x] **`cleen list`** - Show installed versions with active indicator ✅ COMPLETED
+- [ ] **`cleen available`** - List available versions from GitHub
+- [x] **`cleen use <version>`** - Switch to specific version ✅ COMPLETED
+- [ ] **`cleen uninstall <version>`** - Remove installed version
 
 ### Setup Commands
-- [x] **`cleanmanager init`** - Initialize shell configuration ✅ COMPLETED
-- [x] **`cleanmanager doctor`** - Check and repair environment setup ✅ COMPLETED
-- [ ] **Self-update functionality** - Update cleanmanager itself
+- [x] **`cleen init`** - Initialize shell configuration ✅ COMPLETED
+- [x] **`cleen doctor`** - Check and repair environment setup ✅ COMPLETED
+- [ ] **Self-update functionality** - Update cleen itself
 
 ## 🟢 LOW - Advanced Features
 
 ### Enhanced Functionality
-- [ ] **Per-project version overrides** - Support .cleanmanager files
+- [ ] **Per-project version overrides** - Support .cleen files
 - [ ] **Automatic cleanup** - Remove old/unused versions
 - [ ] **Version aliasing** - Support latest, stable aliases
 - [ ] **Offline mode** - Work with cached version info
@@ -102,16 +102,16 @@ zip = "0.6"
 - ✅ **Module Architecture** - Clean separation: commands/, core/, utils/, error/
 
 ### Version Management ✅  
-- ✅ **Storage System** - Complete ~/.cleanmanager directory structure management
+- ✅ **Storage System** - Complete ~/.cleen directory structure management
 - ✅ **Version Detection** - List installed versions with validation
 - ✅ **Shim Management** - Cross-platform symlink/binary routing system
 - ✅ **Shell Integration** - PATH detection and configuration guidance
 
 ### Working Commands ✅
-- ✅ **`cleanmanager list`** - Shows installed versions with active status
-- ✅ **`cleanmanager use <version>`** - Switches between installed versions  
-- ✅ **`cleanmanager doctor`** - Comprehensive environment diagnostics
-- ✅ **`cleanmanager init`** - Shell configuration setup with clear instructions
+- ✅ **`cleen list`** - Shows installed versions with active status
+- ✅ **`cleen use <version>`** - Switches between installed versions
+- ✅ **`cleen doctor`** - Comprehensive environment diagnostics
+- ✅ **`cleen init`** - Shell configuration setup with clear instructions
 
 ### Testing & Validation ✅
 - ✅ **Compilation** - Project builds successfully with minimal warnings
@@ -123,4 +123,4 @@ zip = "0.6"
 - Target platforms: Linux (x86_64), macOS (x86_64/ARM64), Windows (x86_64)
 - GitHub repo: `https://github.com/Ivan-Pasco/clean-language-compiler`
 - Binary name: `cln`
-- Manager name: `cleanmanager`
+- Manager name: `cleen`

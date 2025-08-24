@@ -1,5 +1,5 @@
 use crate::core::{config::Config, version::VersionManager};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::env;
 
 pub fn set_local_version(version: &str) -> Result<()> {
@@ -11,7 +11,7 @@ pub fn set_local_version(version: &str) -> Result<()> {
 
     // Check if version is installed
     if !version_manager.is_version_installed(version) {
-        return Err(CleanManagerError::VersionNotFound {
+        return Err(CleenError::VersionNotFound {
             version: version.to_string(),
         });
     }

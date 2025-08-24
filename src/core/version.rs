@@ -1,5 +1,5 @@
 use crate::core::config::Config;
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use crate::utils::fs;
 use std::fs::read_dir;
 
@@ -117,7 +117,7 @@ impl VersionManager {
     #[allow(dead_code)]
     pub fn install_version(&self, version: &str, binary_path: &std::path::Path) -> Result<()> {
         if self.is_version_installed(version) {
-            return Err(CleanManagerError::VersionAlreadyInstalled {
+            return Err(CleenError::VersionAlreadyInstalled {
                 version: version.to_string(),
             });
         }
@@ -140,7 +140,7 @@ impl VersionManager {
     #[allow(dead_code)]
     pub fn uninstall_version(&self, version: &str) -> Result<()> {
         if !self.is_version_installed(version) {
-            return Err(CleanManagerError::VersionNotFound {
+            return Err(CleenError::VersionNotFound {
                 version: version.to_string(),
             });
         }
@@ -153,14 +153,14 @@ impl VersionManager {
 
     pub fn validate_version(&self, version: &str) -> Result<()> {
         if version.is_empty() {
-            return Err(CleanManagerError::InvalidVersion {
+            return Err(CleenError::InvalidVersion {
                 version: version.to_string(),
             });
         }
 
         // Basic validation - could be enhanced with semver parsing
         if version.contains("..") || version.contains('/') || version.contains('\\') {
-            return Err(CleanManagerError::InvalidVersion {
+            return Err(CleenError::InvalidVersion {
                 version: version.to_string(),
             });
         }

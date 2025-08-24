@@ -1,5 +1,5 @@
 use crate::core::config::Config;
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::io::{self, Write};
 
 pub fn uninstall_version(version: &str) -> Result<()> {
@@ -10,7 +10,7 @@ pub fn uninstall_version(version: &str) -> Result<()> {
 
     // Check if version exists
     if !version_dir.exists() {
-        return Err(CleanManagerError::VersionNotFound {
+        return Err(CleenError::VersionNotFound {
             version: version.to_string(),
         });
     }

@@ -1,5 +1,5 @@
 use crate::core::{config::Config, download::Downloader, github::GitHubClient, version::normalize};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::path::Path;
 
 pub fn install_version(version: &str) -> Result<()> {
@@ -37,7 +37,7 @@ pub fn install_version(version: &str) -> Result<()> {
     // Check if version is already installed (using clean version for storage)
     let version_dir = config.get_version_dir(&clean_version);
     if version_dir.exists() {
-        return Err(CleanManagerError::VersionAlreadyInstalled {
+        return Err(CleenError::VersionAlreadyInstalled {
             version: clean_version.clone(),
         });
     }
@@ -75,7 +75,7 @@ pub fn install_version(version: &str) -> Result<()> {
             for r in &releases {
                 println!("  • {}", normalize::to_clean_version(&r.tag_name));
             }
-            CleanManagerError::VersionNotFound {
+            CleenError::VersionNotFound {
                 version: clean_version.clone(),
             }
         })?;
@@ -108,7 +108,7 @@ pub fn install_version(version: &str) -> Result<()> {
             for asset in &release.assets {
                 println!("  • {}", asset.name);
             }
-            CleanManagerError::BinaryNotFound {
+            CleenError::BinaryNotFound {
                 name: format!("Asset for platform {platform_suffix} (or universal binary)"),
             }
         })?;
@@ -124,7 +124,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("Downloading {}...", asset.name);
     downloader
         .download_file(&asset.browser_download_url, &download_path)
-        .map_err(|_e| CleanManagerError::DownloadError {
+        .map_err(|_e| CleenError::DownloadError {
             url: asset.browser_download_url.clone(),
         })?;
 
@@ -135,7 +135,7 @@ pub fn install_version(version: &str) -> Result<()> {
         println!("Extracting archive...");
         downloader
             .extract_archive(&download_path, &version_dir)
-            .map_err(|_e| CleanManagerError::ExtractionError {
+            .map_err(|_e| CleenError::ExtractionError {
                 path: download_path.clone(),
             })?;
     } else {
@@ -296,7 +296,7 @@ fn find_binary_in_dir(dir: &Path) -> Result<std::path::PathBuf> {
         }
     }
 
-    Err(CleanManagerError::BinaryNotFound {
+    Err(CleenError::BinaryNotFound {
         name: binary_name.to_string(),
     })
 }

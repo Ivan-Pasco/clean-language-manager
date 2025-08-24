@@ -58,7 +58,7 @@ function Add-ToPath {
 }
 
 # Function to download and extract
-function Install-CleanManager {
+function Install-Cleen {
     $version = Get-LatestVersion
     $downloadUrl = "https://github.com/$Repo/releases/download/$version/$ArchiveName"
     
@@ -150,7 +150,7 @@ function Install-CleanManager {
 
 # Main execution
 try {
-    Install-CleanManager
+    Install-Cleen
 }
 catch {
     Write-Error "Installation failed: $_"

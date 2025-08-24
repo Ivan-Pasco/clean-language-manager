@@ -1,5 +1,5 @@
 use crate::core::{config::Config, github::GitHubClient, download::Downloader};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::{env, fs, path::Path};
 
 pub fn update_self_auto() -> Result<()> {
@@ -45,7 +45,7 @@ fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
 
     // Get current binary path
     let current_exe = env::current_exe()
-        .map_err(|e| CleanManagerError::UpdateError {
+        .map_err(|e| CleenError::UpdateError {
             message: format!("Failed to get current executable path: {}", e),
         })?;
 
@@ -72,7 +72,7 @@ fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
     println!("⬇️  Downloading {}...", asset.name);
     downloader
         .download_file(&asset.browser_download_url, &download_path)
-        .map_err(|_| CleanManagerError::UpdateError {
+        .map_err(|_| CleenError::UpdateError {
             message: "Failed to download update".to_string(),
         })?;
 
@@ -138,7 +138,7 @@ fn find_update_asset<'a>(release: &'a crate::core::github::Release, platform_suf
             for asset in &release.assets {
                 eprintln!("  • {}", asset.name);
             }
-            CleanManagerError::UpdateError {
+            CleenError::UpdateError {
                 message: format!("No suitable binary found for platform {}", platform_suffix),
             }
         })
@@ -167,7 +167,7 @@ fn prepare_new_binary(download_path: &Path, temp_dir: &Path, asset_name: &str) -
         let downloader = Downloader::new();
         downloader
             .extract_archive(download_path, temp_dir)
-            .map_err(|_| CleanManagerError::UpdateError {
+            .map_err(|_| CleenError::UpdateError {
                 message: "Failed to extract archive".to_string(),
             })?;
         
@@ -211,7 +211,7 @@ fn find_binary_in_extracted_dir(dir: &Path, binary_name: &str) -> Result<std::pa
         }
     }
     
-    Err(CleanManagerError::UpdateError {
+    Err(CleenError::UpdateError {
         message: format!("Binary '{}' not found in extracted archive", binary_name),
     })
 }
@@ -238,7 +238,7 @@ fn replace_current_binary(current_exe: &Path, new_binary: &Path, _backup_path: &
             Err(e) => {
                 // Failed - restore original
                 let _ = fs::rename(temp_path, current_exe);
-                return Err(CleanManagerError::UpdateError {
+                return Err(CleenError::UpdateError {
                     message: format!("Failed to replace binary: {}", e),
                 });
             }

@@ -365,20 +365,20 @@ To update cleen:
 
 ### Supported Variables
 
-- `CLEANMANAGER_HOME` - Override default installation directory (default: `~/.cleen`)
-- `CLEANMANAGER_GITHUB_TOKEN` - GitHub personal access token for rate limit increases
+- `CLEEN_HOME` - Override default installation directory (default: `~/.cleen`)
+- `CLEEN_GITHUB_TOKEN` - GitHub personal access token for rate limit increases
 - `NO_COLOR` - Disable colored output
-- `CLEANMANAGER_VERBOSE` - Enable verbose logging
+- `CLEEN_VERBOSE` - Enable verbose logging
 
 ### Usage Examples
 
 ```bash
 # Custom installation directory
-export CLEANMANAGER_HOME="/opt/cleen"
+export CLEEN_HOME="/opt/cleen"
 cleen install latest
 
 # GitHub token for higher rate limits
-export CLEANMANAGER_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+export CLEEN_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 cleen available
 
 # Disable colors for scripting
@@ -482,10 +482,10 @@ Check directory permissions or run with appropriate privileges
 ## Logging and Debugging
 
 ### Verbose Mode
-Set `CLEANMANAGER_VERBOSE=1` for detailed operation logging:
+Set `CLEEN_VERBOSE=1` for detailed operation logging:
 
 ```bash
-export CLEANMANAGER_VERBOSE=1
+export CLEEN_VERBOSE=1
 cleen install v0.4.1
 ```
 

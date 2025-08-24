@@ -1,5 +1,5 @@
 use crate::core::{config::Config, shim::ShimManager, version::VersionManager};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::env;
 use std::process::Command;
 
@@ -222,9 +222,9 @@ fn test_runtime_execution() -> Result<()> {
     let test_file = temp_dir.join("cleen_runtime_test.cln");
 
     // Write test program
-    std::fs::write(&test_file, test_program).map_err(|e| CleanManagerError::ValidationError {
-        message: format!("Failed to create test file: {e}"),
-    })?;
+            std::fs::write(&test_file, test_program).map_err(|e| CleenError::ValidationError {
+            message: format!("Failed to create test file: {e}"),
+        })?;
 
     // Try to run the program
     let run_result = Command::new("cln")
@@ -242,28 +242,28 @@ fn test_runtime_execution() -> Result<()> {
                 if stdout.contains("test") {
                     Ok(())
                 } else {
-                    Err(CleanManagerError::ValidationError {
+                    Err(CleenError::ValidationError {
                         message: "Runtime executed but output was unexpected".to_string(),
                     })
                 }
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 if stderr.contains("WebAssembly translation error") {
-                    Err(CleanManagerError::ValidationError {
+                    Err(CleenError::ValidationError {
                         message: "WebAssembly runtime configuration issue".to_string(),
                     })
                 } else if stderr.contains("incompatible import type") {
-                    Err(CleanManagerError::ValidationError {
+                    Err(CleenError::ValidationError {
                         message: "Host function signature mismatch".to_string(),
                     })
                 } else {
-                    Err(CleanManagerError::ValidationError {
+                    Err(CleenError::ValidationError {
                         message: format!("Runtime execution failed: {stderr}"),
                     })
                 }
             }
         }
-        Err(e) => Err(CleanManagerError::ValidationError {
+        Err(e) => Err(CleenError::ValidationError {
             message: format!("Failed to execute runtime test: {e}"),
         }),
     }

@@ -1,13 +1,13 @@
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::path::Path;
 
 pub fn ensure_dir_exists(path: &Path) -> Result<()> {
     if !path.exists() {
         std::fs::create_dir_all(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::PermissionDenied => CleanManagerError::PermissionDenied {
+            std::io::ErrorKind::PermissionDenied => CleenError::PermissionDenied {
                 path: path.to_path_buf(),
             },
-            _ => CleanManagerError::from(e),
+            _ => CleenError::from(e),
         })?;
     }
     Ok(())
@@ -16,10 +16,10 @@ pub fn ensure_dir_exists(path: &Path) -> Result<()> {
 pub fn remove_dir_recursive(path: &Path) -> Result<()> {
     if path.exists() {
         std::fs::remove_dir_all(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::PermissionDenied => CleanManagerError::PermissionDenied {
+            std::io::ErrorKind::PermissionDenied => CleenError::PermissionDenied {
                 path: path.to_path_buf(),
             },
-            _ => CleanManagerError::from(e),
+            _ => CleenError::from(e),
         })?;
     }
     Ok(())

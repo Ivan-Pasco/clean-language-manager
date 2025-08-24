@@ -1,6 +1,6 @@
 use crate::commands::install;
 use crate::core::{config::Config, version::VersionManager};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use std::env;
 
 pub fn sync_project_version() -> Result<()> {
@@ -71,7 +71,7 @@ pub fn sync_project_version() -> Result<()> {
             println!("🔍 Or check what versions are available:");
             println!("  cleen available");
 
-            return Err(CleanManagerError::ConfigError {
+            return Err(CleenError::ConfigError {
                 message: "No .cleanlanguage/.cleanversion file found".to_string(),
             });
         }

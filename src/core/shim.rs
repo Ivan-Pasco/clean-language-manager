@@ -1,5 +1,5 @@
 use crate::core::{config::Config, version::normalize};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use crate::utils::fs;
 use std::path::Path;
 
@@ -65,7 +65,7 @@ impl ShimManager {
                 if v_path.exists() {
                     v_path
                 } else {
-                    return Err(CleanManagerError::VersionNotFound {
+                    return Err(CleenError::VersionNotFound {
                         version: version.to_string(),
                     });
                 }

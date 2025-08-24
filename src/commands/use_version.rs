@@ -1,5 +1,5 @@
 use crate::core::{config::Config, shim::ShimManager, version::{VersionManager, normalize}};
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 
 pub fn use_version(version: &str) -> Result<()> {
     let mut config = Config::load()?;
@@ -13,7 +13,7 @@ pub fn use_version(version: &str) -> Result<()> {
 
     // Check if version is installed (using clean version)
     if !version_manager.is_version_installed(&clean_version) {
-        return Err(CleanManagerError::VersionNotFound {
+        return Err(CleenError::VersionNotFound {
             version: clean_version.clone(),
         });
     }

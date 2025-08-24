@@ -1,5 +1,5 @@
 [package]
-name = "cleanmanager"
+name = "cleen"
 version = "0.1.9"
 authors = ["Clean Language Team"]
 edition = "2021"

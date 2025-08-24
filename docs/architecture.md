@@ -192,7 +192,7 @@ Execute appropriate binary
 The manager uses a hierarchical error handling system:
 
 ```rust
-CleanManagerError
+CleenError
 ├── ConfigError          // Configuration file issues
 ├── VersionError         // Version management problems
 ├── DownloadError        // Network and download failures

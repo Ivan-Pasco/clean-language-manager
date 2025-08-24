@@ -1,6 +1,6 @@
 # 🧼 Clean Language Manager – Functional Definition
 
-**`cleanmanager`** is the official version manager for the Clean Language compiler (`cln`). It allows developers to easily install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems. It is written in **Rust** and distributed as a native executable via GitHub Releases.
+**`cleen`** is the official version manager for the Clean Language compiler (`cln`). It allows developers to easily install, switch, and manage multiple versions of Clean Language across macOS, Linux, and Windows systems. It is written in **Rust** and distributed as a native executable via GitHub Releases.
 
 ---
 
@@ -12,7 +12,7 @@
 * Each version is stored in its own isolated directory:
 
 ```
-~/.cleanmanager/versions/1.2.3/cln
+~/.cleen/versions/1.2.3/cln
 ```
 
 * This ensures clean separation of versions and simplifies upgrades/downgrades.
@@ -21,10 +21,10 @@
 
 ### b. Registering the Command
 
-* `cleanmanager` installs a **shim** or **symbolic link** in the bin directory:
+* `cleen` installs a **shim** or **symbolic link** in the bin directory:
 
 ```
-~/.cleanmanager/bin/cln
+~/.cleen/bin/cln
 ```
 
 * This path is added to the user's environment `PATH`.
@@ -37,11 +37,11 @@
 * To activate a specific version, the user runs:
 
 ```bash
-cleanmanager use 1.2.3
+cleen use 1.2.3
 ```
 
 * The symlink is updated to point to the selected version's binary.
-* **Optional:** The manager can support per-project version overrides via a `.cleanmanager` file in the project directory.
+* **Optional:** The manager can support per-project version overrides via a `.cleen` file in the project directory.
 
 ---
 
@@ -50,13 +50,13 @@ cleanmanager use 1.2.3
 * Versions can be uninstalled with:
 
 ```bash
-cleanmanager uninstall 1.2.3
+cleen uninstall 1.2.3
 ```
 
 * The latest version can be upgraded or installed with:
 
 ```bash
-cleanmanager install latest
+cleen install latest
 ```
 
 * Old versions can be listed and cleaned automatically to free up space.
@@ -68,9 +68,9 @@ cleanmanager install latest
 | Step           | Description                                                                |
 | -------------- | -------------------------------------------------------------------------- |
 | **Download**   | Fetches the requested version's binary or source archive from GitHub       |
-| **Extract**    | Unpacks the file to `~/.cleanmanager/versions/<version>/`                  |
-| **Shim Link**  | Creates/updates `~/.cleanmanager/bin/cln` to point to the chosen binary |
-| **PATH Check** | Ensures `~/.cleanmanager/bin/` is included in `.bashrc`, `.zshrc`, etc.    |
+| **Extract**    | Unpacks the file to `~/.cleen/versions/<version>/`                  |
+| **Shim Link**  | Creates/updates `~/.cleen/bin/cln` to point to the chosen binary |
+| **PATH Check** | Ensures `~/.cleen/bin/` is included in `.bashrc`, `.zshrc`, etc.    |
 | **Execution**  | Running `cln` invokes the shim, which redirects to the active version   |
 
 ---
@@ -78,14 +78,14 @@ cleanmanager install latest
 ## 🧪 Example Workflow
 
 ```bash
-cleanmanager install 1.2.3
+cleen install 1.2.3
 # → Downloads and installs Clean Language v1.2.3
 
-cleanmanager use 1.2.3
+cleen use 1.2.3
 # → Activates version 1.2.3 as the default
 
 cln --version
-# → Runs ~/.cleanmanager/versions/1.2.3/cln --version
+# → Runs ~/.cleen/versions/1.2.3/cln --version
 ```
 
 ---
@@ -94,11 +94,11 @@ cln --version
 
 | Command                        | Description                                 |
 | ------------------------------ | ------------------------------------------- |
-| `cleanmanager list`            | Lists all installed versions                |
-| `cleanmanager available`       | Lists available versions from GitHub        |
-| `cleanmanager uninstall x.y.z` | Removes a specific installed version        |
-| `cleanmanager doctor`          | Checks and repairs environment config       |
-| `cleanmanager init`            | Adds the bin path to your shell config file |
+| `cleen list`            | Lists all installed versions                |
+| `cleen available`       | Lists available versions from GitHub        |
+| `cleen uninstall x.y.z` | Removes a specific installed version        |
+| `cleen doctor`          | Checks and repairs environment config       |
+| `cleen init`            | Adds the bin path to your shell config file |
 
 ---
 

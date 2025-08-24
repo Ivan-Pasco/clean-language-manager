@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, CleanManagerError>;
+pub type Result<T> = std::result::Result<T, CleenError>;
 
 #[derive(Error, Debug)]
-pub enum CleanManagerError {
+pub enum CleenError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -60,39 +60,39 @@ pub enum CleanManagerError {
     UpdateError { message: String },
 }
 
-impl From<anyhow::Error> for CleanManagerError {
+impl From<anyhow::Error> for CleenError {
     fn from(error: anyhow::Error) -> Self {
-        CleanManagerError::ShellError {
+        CleenError::ShellError {
             message: error.to_string(),
         }
     }
 }
 
-impl CleanManagerError {
+impl CleenError {
     #[allow(dead_code)]
     pub fn config_error<S: Into<String>>(message: S) -> Self {
-        CleanManagerError::ConfigError {
+        CleenError::ConfigError {
             message: message.into(),
         }
     }
 
     #[allow(dead_code)]
     pub fn github_error<S: Into<String>>(message: S) -> Self {
-        CleanManagerError::GitHubError {
+        CleenError::GitHubError {
             message: message.into(),
         }
     }
 
     #[allow(dead_code)]
     pub fn shell_error<S: Into<String>>(message: S) -> Self {
-        CleanManagerError::ShellError {
+        CleenError::ShellError {
             message: message.into(),
         }
     }
 
     #[allow(dead_code)]
     pub fn environment_error<S: Into<String>>(message: S) -> Self {
-        CleanManagerError::EnvironmentError {
+        CleenError::EnvironmentError {
             message: message.into(),
         }
     }

@@ -1,4 +1,4 @@
-use crate::error::{CleanManagerError, Result};
+use crate::error::{CleenError, Result};
 use crate::utils::fs;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -249,7 +249,7 @@ impl Config {
 fn get_cleen_dir() -> Result<PathBuf> {
     dirs::home_dir()
         .map(|home| home.join(".cleen"))
-        .ok_or(CleanManagerError::HomeDirectoryNotFound)
+        .ok_or(CleenError::HomeDirectoryNotFound)
 }
 
 fn get_config_path() -> Result<PathBuf> {
