@@ -1,4 +1,4 @@
-use crate::core::{config::Config, download::Downloader, github::GitHubClient};
+use crate::core::{config::Config, download::Downloader, github::GitHubClient, version::normalize};
 use crate::error::{CleanManagerError, Result};
 use std::path::Path;
 
@@ -9,16 +9,8 @@ pub fn install_version(version: &str) -> Result<()> {
     let github_client = GitHubClient::new(config.github_api_token.clone());
     let downloader = Downloader::new();
 
-    // Check if version is already installed
-    let version_dir = config.get_version_dir(version);
-    if version_dir.exists() {
-        return Err(CleanManagerError::VersionAlreadyInstalled {
-            version: version.to_string(),
-        });
-    }
-
-    // Resolve version (handle "latest")
-    let actual_version = if version == "latest" {
+    // Resolve version (handle "latest") first and normalize to GitHub format
+    let github_version = if version == "latest" {
         println!("Fetching latest release...");
         match github_client.get_latest_release("Ivan-Pasco", "clean-language-compiler") {
             Ok(release) => {
@@ -34,10 +26,21 @@ pub fn install_version(version: &str) -> Result<()> {
             }
         }
     } else {
-        version.to_string()
+        normalize::to_github_version(version)
     };
 
-    println!("Resolved version: {actual_version}");
+    // Normalize to clean version for local storage
+    let clean_version = normalize::to_clean_version(&github_version);
+
+    println!("Resolved version: {clean_version}");
+
+    // Check if version is already installed (using clean version for storage)
+    let version_dir = config.get_version_dir(&clean_version);
+    if version_dir.exists() {
+        return Err(CleanManagerError::VersionAlreadyInstalled {
+            version: clean_version.clone(),
+        });
+    }
 
     // Get releases and find the specified version
     println!("Fetching available releases...");
@@ -66,14 +69,14 @@ pub fn install_version(version: &str) -> Result<()> {
 
     let release = releases
         .iter()
-        .find(|r| r.tag_name == actual_version)
+        .find(|r| r.tag_name == github_version)
         .ok_or_else(|| {
             println!("Available versions:");
             for r in &releases {
-                println!("  • {}", r.tag_name);
+                println!("  • {}", normalize::to_clean_version(&r.tag_name));
             }
             CleanManagerError::VersionNotFound {
-                version: actual_version.clone(),
+                version: clean_version.clone(),
             }
         })?;
 
@@ -113,7 +116,7 @@ pub fn install_version(version: &str) -> Result<()> {
     println!("Found asset: {}", asset.name);
 
     // Create temporary download directory
-    let temp_dir = std::env::temp_dir().join(format!("cleen-{actual_version}"));
+    let temp_dir = std::env::temp_dir().join(format!("cleen-{clean_version}"));
     std::fs::create_dir_all(&temp_dir)?;
 
     // Download the asset
@@ -167,11 +170,11 @@ pub fn install_version(version: &str) -> Result<()> {
         println!(" ✅");
     }
 
-    println!("✅ Successfully installed Clean Language version {actual_version}");
+    println!("✅ Successfully installed Clean Language version {clean_version}");
     println!("   Binary location: {binary_path:?}");
     println!();
     println!("To use this version, run:");
-    println!("   cleen use {actual_version}");
+    println!("   cleen use {clean_version}");
 
     Ok(())
 }

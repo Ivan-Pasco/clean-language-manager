@@ -1,4 +1,4 @@
-use crate::core::config::Config;
+use crate::core::{config::Config, version::normalize};
 use crate::error::{CleanManagerError, Result};
 use crate::utils::fs;
 use std::path::Path;
@@ -13,15 +13,8 @@ impl ShimManager {
     }
 
     pub fn create_shim(&self, version: &str) -> Result<()> {
-        let binary_path = self.config.get_version_binary(version);
+        let clean_version = normalize::to_clean_version(version);
         let shim_path = self.config.get_shim_path();
-
-        // Validate that the version binary exists
-        if !binary_path.exists() {
-            return Err(CleanManagerError::VersionNotFound {
-                version: version.to_string(),
-            });
-        }
 
         // Remove existing shim if it exists
         self.remove_shim()?;
@@ -30,9 +23,9 @@ impl ShimManager {
         fs::ensure_dir_exists(&self.config.get_bin_dir())?;
 
         // Create smart shim that checks for project versions
-        self.create_smart_shim(&shim_path)?;
+        self.create_smart_shim(&shim_path, &clean_version)?;
 
-        println!("✅ Activated Clean Language version {version}");
+        println!("✅ Activated Clean Language version {clean_version}");
 
         Ok(())
     }
@@ -60,14 +53,26 @@ impl ShimManager {
     }
 
     /// Create a smart shim that checks for project-specific versions
-    fn create_smart_shim(&self, shim_path: &Path) -> Result<()> {
-        // For now, create a simple symlink to the global version
-        // In a future enhancement, this could be a script that checks for .cleanversion
-        if let Some(version) = &self.config.active_version {
-            let binary_path = self.config.get_version_binary(version);
-            self.create_link(&binary_path, shim_path)?;
-        }
-
+    fn create_smart_shim(&self, shim_path: &Path, version: &str) -> Result<()> {
+        // Find the actual binary path (checking both clean and v-prefixed versions)
+        let binary_path = {
+            let clean_path = self.config.get_version_binary(version);
+            if clean_path.exists() {
+                clean_path
+            } else {
+                let v_version = normalize::to_github_version(version);
+                let v_path = self.config.get_version_binary(&v_version);
+                if v_path.exists() {
+                    v_path
+                } else {
+                    return Err(CleanManagerError::VersionNotFound {
+                        version: version.to_string(),
+                    });
+                }
+            }
+        };
+        
+        self.create_link(&binary_path, shim_path)?;
         Ok(())
     }
 

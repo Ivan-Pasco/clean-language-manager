@@ -3,6 +3,38 @@ use crate::error::{CleanManagerError, Result};
 use crate::utils::fs;
 use std::fs::read_dir;
 
+/// Version normalization utilities
+pub mod normalize {
+    /// Normalize a version string by removing the 'v' prefix if present
+    /// Examples: "v0.6.2" -> "0.6.2", "0.6.2" -> "0.6.2", "latest" -> "latest"
+    pub fn to_clean_version(version: &str) -> String {
+        if version == "latest" {
+            version.to_string()
+        } else if version.starts_with('v') {
+            version[1..].to_string()
+        } else {
+            version.to_string()
+        }
+    }
+
+    /// Convert a clean version to GitHub release format by adding 'v' prefix if needed
+    /// Examples: "0.6.2" -> "v0.6.2", "v0.6.2" -> "v0.6.2", "latest" -> "latest"
+    pub fn to_github_version(version: &str) -> String {
+        if version == "latest" {
+            version.to_string()
+        } else if version.starts_with('v') {
+            version.to_string()
+        } else {
+            format!("v{}", version)
+        }
+    }
+
+    /// Check if two versions are equivalent (ignoring v prefix)
+    pub fn versions_equal(a: &str, b: &str) -> bool {
+        to_clean_version(a) == to_clean_version(b)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VersionInfo {
     pub version: String,
@@ -64,8 +96,18 @@ impl VersionManager {
     }
 
     pub fn is_version_installed(&self, version: &str) -> bool {
-        let binary_path = self.config.get_version_binary(version);
-        binary_path.exists()
+        let clean_version = normalize::to_clean_version(version);
+        
+        // First check the clean version directory
+        let binary_path = self.config.get_version_binary(&clean_version);
+        if binary_path.exists() {
+            return true;
+        }
+        
+        // For backward compatibility, also check the v-prefixed directory
+        let v_version = normalize::to_github_version(&clean_version);
+        let v_binary_path = self.config.get_version_binary(&v_version);
+        v_binary_path.exists()
     }
 
     pub fn get_active_version(&self) -> Option<&String> {
@@ -133,11 +175,14 @@ impl VersionManager {
 }
 
 fn version_compare(a: &str, b: &str) -> std::cmp::Ordering {
-    // Simple version comparison - could be enhanced with proper semver parsing
+    // Normalize versions before comparison to handle v prefixes consistently
     use std::cmp::Ordering;
 
-    let a_parts: Vec<&str> = a.split('.').collect();
-    let b_parts: Vec<&str> = b.split('.').collect();
+    let a_clean = normalize::to_clean_version(a);
+    let b_clean = normalize::to_clean_version(b);
+
+    let a_parts: Vec<&str> = a_clean.split('.').collect();
+    let b_parts: Vec<&str> = b_clean.split('.').collect();
 
     for (a_part, b_part) in a_parts.iter().zip(b_parts.iter()) {
         match (a_part.parse::<u32>(), b_part.parse::<u32>()) {

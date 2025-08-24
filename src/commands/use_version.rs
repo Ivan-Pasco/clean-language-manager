@@ -1,28 +1,32 @@
-use crate::core::{config::Config, shim::ShimManager, version::VersionManager};
+use crate::core::{config::Config, shim::ShimManager, version::{VersionManager, normalize}};
 use crate::error::{CleanManagerError, Result};
 
 pub fn use_version(version: &str) -> Result<()> {
     let mut config = Config::load()?;
     let version_manager = VersionManager::new(config.clone());
 
-    // Validate version format
-    version_manager.validate_version(version)?;
+    // Normalize the version to clean format
+    let clean_version = normalize::to_clean_version(version);
 
-    // Check if version is installed
-    if !version_manager.is_version_installed(version) {
+    // Validate version format
+    version_manager.validate_version(&clean_version)?;
+
+    // Check if version is installed (using clean version)
+    if !version_manager.is_version_installed(&clean_version) {
         return Err(CleanManagerError::VersionNotFound {
-            version: version.to_string(),
+            version: clean_version.clone(),
         });
     }
 
-    // Update active version in config
-    config.set_active_version(version.to_string())?;
+    // Update active version in config (using clean version)
+    config.set_active_version(clean_version.clone())?;
 
     // Create/update shim
     let shim_manager = ShimManager::new(config);
-    shim_manager.create_shim(version)?;
+    shim_manager.create_shim(&clean_version)?;
 
-    println!("Now using Clean Language version {version}");
+    println!("✅ Activated Clean Language version {clean_version}");
+    println!("Now using Clean Language version {clean_version}");
     println!();
     println!("Verify with: cln --version");
 

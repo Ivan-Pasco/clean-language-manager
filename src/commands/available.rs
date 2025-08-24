@@ -1,4 +1,4 @@
-use crate::core::github::GitHubClient;
+use crate::core::{github::GitHubClient, version::normalize};
 use anyhow::Result;
 
 pub fn list_available_versions() -> Result<()> {
@@ -20,6 +20,7 @@ pub fn list_available_versions() -> Result<()> {
                 println!();
 
                 for (i, release) in releases.iter().enumerate() {
+                    let clean_version = normalize::to_clean_version(&release.tag_name);
                     let status = if i == 0 { " (latest)" } else { "" };
                     let prerelease = if release.prerelease {
                         " [prerelease]"
@@ -27,7 +28,7 @@ pub fn list_available_versions() -> Result<()> {
                         ""
                     };
 
-                    println!("  • {}{}{}", release.tag_name, status, prerelease);
+                    println!("  • {}{}{}", clean_version, status, prerelease);
                     if !release.name.is_empty() && release.name != release.tag_name {
                         println!("    {}", release.name);
                     }
@@ -48,7 +49,8 @@ pub fn list_available_versions() -> Result<()> {
 
                 println!("💡 Examples:");
                 if let Some(latest) = releases.first() {
-                    println!("  cleen install {}", latest.tag_name);
+                    let clean_version = normalize::to_clean_version(&latest.tag_name);
+                    println!("  cleen install {}", clean_version);
                 }
                 println!("  cleen install latest");
             }
