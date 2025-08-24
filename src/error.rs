@@ -55,6 +55,9 @@ pub enum CleanManagerError {
 
     #[error("Binary validation error: {message}")]
     ValidationError { message: String },
+
+    #[error("Update error: {message}")]
+    UpdateError { message: String },
 }
 
 impl From<anyhow::Error> for CleanManagerError {

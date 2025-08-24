@@ -1,8 +1,8 @@
-use crate::core::{config::Config, github::GitHubClient};
-use crate::error::Result;
-use std::env;
+use crate::core::{config::Config, github::GitHubClient, download::Downloader};
+use crate::error::{CleanManagerError, Result};
+use std::{env, fs, path::Path};
 
-pub fn update_self() -> Result<()> {
+pub fn update_self_auto() -> Result<()> {
     println!("🔄 Checking for cleen updates...");
 
     let github = GitHubClient::new(None);
@@ -30,23 +30,233 @@ pub fn update_self() -> Result<()> {
         latest_release.tag_name, current_version
     );
     println!();
-    println!("To update cleen:");
-    println!("  1. Visit: https://github.com/Ivan-Pasco/clean-language-manager/releases/latest");
-    println!("  2. Or use the install script:");
 
-    if cfg!(windows) {
-        println!("     iwr https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/download/install.ps1 | iex");
-    } else {
-        println!("     curl -sSL https://github.com/Ivan-Pasco/clean-language-manager/releases/latest/download/install.sh | bash");
-    }
-
-    println!();
-    println!("  3. Or build from source:");
-    println!("     git pull && cargo install --path .");
+    perform_auto_update(&latest_release)?;
 
     let mut config = Config::load()?;
     config.update_last_self_check_time()?;
 
+    Ok(())
+}
+
+
+fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
+    println!("🚀 Starting automatic update to {}...", release.tag_name);
+
+    // Get current binary path
+    let current_exe = env::current_exe()
+        .map_err(|e| CleanManagerError::UpdateError {
+            message: format!("Failed to get current executable path: {}", e),
+        })?;
+
+    println!("📍 Current binary: {}", current_exe.display());
+
+    // Find appropriate asset for current platform
+    let platform_suffix = get_platform_suffix();
+    println!("🔍 Looking for platform: {}", platform_suffix);
+
+    let asset = find_update_asset(release, &platform_suffix)?;
+    println!("📦 Found asset: {}", asset.name);
+
+    // Create backup
+    let backup_path = create_backup(&current_exe)?;
+    println!("💾 Created backup: {}", backup_path.display());
+
+    // Download new version
+    let temp_dir = env::temp_dir().join(format!("cleen-update-{}", release.tag_name));
+    fs::create_dir_all(&temp_dir)?;
+
+    let downloader = Downloader::new();
+    let download_path = temp_dir.join(&asset.name);
+    
+    println!("⬇️  Downloading {}...", asset.name);
+    downloader
+        .download_file(&asset.browser_download_url, &download_path)
+        .map_err(|_| CleanManagerError::UpdateError {
+            message: "Failed to download update".to_string(),
+        })?;
+
+    // Extract or prepare binary
+    let new_binary_path = prepare_new_binary(&download_path, &temp_dir, &asset.name)?;
+    
+    // Replace current binary
+    replace_current_binary(&current_exe, &new_binary_path, &backup_path)?;
+
+    // Clean up
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    println!("✅ Successfully updated cleen to version {}", release.tag_name);
+    println!("🔄 Please restart your terminal session to use the new version");
+    println!("📝 The previous version has been backed up to: {}", backup_path.display());
+
+    Ok(())
+}
+
+fn get_platform_suffix() -> String {
+    let os = if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "unknown"
+    };
+
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "unknown"
+    };
+
+    format!("{}-{}", os, arch)
+}
+
+fn find_update_asset<'a>(release: &'a crate::core::github::Release, platform_suffix: &str) -> Result<&'a crate::core::github::Asset> {
+    let binary_name = if cfg!(windows) { "cleen.exe" } else { "cleen" };
+    
+    // Look for platform-specific asset
+    release
+        .assets
+        .iter()
+        .find(|asset| {
+            let name_lower = asset.name.to_lowercase();
+            name_lower.contains(&platform_suffix.to_lowercase()) && 
+            (name_lower.contains("cleen") || name_lower == binary_name)
+        })
+        .or_else(|| {
+            // Fallback: look for any cleen binary
+            release.assets.iter().find(|asset| {
+                let name = &asset.name;
+                name.contains("cleen") || name == binary_name
+            })
+        })
+        .ok_or_else(|| {
+            eprintln!("Available assets:");
+            for asset in &release.assets {
+                eprintln!("  • {}", asset.name);
+            }
+            CleanManagerError::UpdateError {
+                message: format!("No suitable binary found for platform {}", platform_suffix),
+            }
+        })
+}
+
+fn create_backup(current_exe: &Path) -> Result<std::path::PathBuf> {
+    let backup_name = format!(
+        "cleen-backup-{}.{}",
+        chrono::Utc::now().format("%Y%m%d-%H%M%S"),
+        if cfg!(windows) { "exe" } else { "bak" }
+    );
+    
+    let backup_path = current_exe.parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(backup_name);
+        
+    fs::copy(current_exe, &backup_path)?;
+    Ok(backup_path)
+}
+
+fn prepare_new_binary(download_path: &Path, temp_dir: &Path, asset_name: &str) -> Result<std::path::PathBuf> {
+    let binary_name = if cfg!(windows) { "cleen.exe" } else { "cleen" };
+    
+    if asset_name.ends_with(".tar.gz") || asset_name.ends_with(".zip") {
+        println!("📦 Extracting archive...");
+        let downloader = Downloader::new();
+        downloader
+            .extract_archive(download_path, temp_dir)
+            .map_err(|_| CleanManagerError::UpdateError {
+                message: "Failed to extract archive".to_string(),
+            })?;
+        
+        // Find the binary in the extracted files
+        find_binary_in_extracted_dir(temp_dir, binary_name)
+    } else {
+        // Direct binary download
+        let binary_path = temp_dir.join(binary_name);
+        fs::copy(download_path, &binary_path)?;
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&binary_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&binary_path, perms)?;
+        }
+        
+        Ok(binary_path)
+    }
+}
+
+fn find_binary_in_extracted_dir(dir: &Path, binary_name: &str) -> Result<std::path::PathBuf> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        
+        if path.is_dir() {
+            if let Ok(found) = find_binary_in_extracted_dir(&path, binary_name) {
+                return Ok(found);
+            }
+        } else if path.file_name().and_then(|n| n.to_str()) == Some(binary_name) {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = fs::metadata(&path)?.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&path, perms)?;
+            }
+            return Ok(path);
+        }
+    }
+    
+    Err(CleanManagerError::UpdateError {
+        message: format!("Binary '{}' not found in extracted archive", binary_name),
+    })
+}
+
+fn replace_current_binary(current_exe: &Path, new_binary: &Path, _backup_path: &Path) -> Result<()> {
+    println!("🔄 Replacing current binary...");
+    
+    #[cfg(windows)]
+    {
+        // On Windows, we can't replace a running executable directly
+        // We need to use a different approach
+        let temp_name = format!("{}.old", current_exe.to_string_lossy());
+        let temp_path = Path::new(&temp_name);
+        
+        // Move current exe to temp location
+        fs::rename(current_exe, temp_path)?;
+        
+        // Copy new binary to current location
+        match fs::copy(new_binary, current_exe) {
+            Ok(_) => {
+                // Success - remove old binary
+                let _ = fs::remove_file(temp_path);
+            }
+            Err(e) => {
+                // Failed - restore original
+                let _ = fs::rename(temp_path, current_exe);
+                return Err(CleanManagerError::UpdateError {
+                    message: format!("Failed to replace binary: {}", e),
+                });
+            }
+        }
+    }
+    
+    #[cfg(unix)]
+    {
+        // On Unix, we can replace the binary directly
+        fs::copy(new_binary, current_exe)?;
+        
+        // Ensure it's executable
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(current_exe)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(current_exe, perms)?;
+    }
+    
     Ok(())
 }
 
@@ -105,7 +315,7 @@ pub fn check_updates_if_needed() -> Result<()> {
         let _ = config.update_last_check_time();
     }
 
-    if config.should_check_self_updates() && update_self().is_ok() {
+    if config.should_check_self_updates() && update_self_auto().is_ok() {
         let _ = config.update_last_self_check_time();
     }
 

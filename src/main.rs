@@ -75,7 +75,7 @@ fn main() -> Result<()> {
         Commands::Init => commands::init::init_shell().map_err(|e| anyhow::anyhow!(e)),
         Commands::Doctor => commands::doctor::check_environment().map_err(|e| anyhow::anyhow!(e)),
         Commands::Update => commands::update::check_for_updates().map_err(|e| anyhow::anyhow!(e)),
-        Commands::SelfUpdate => commands::update::update_self().map_err(|e| anyhow::anyhow!(e)),
+        Commands::SelfUpdate => commands::update::update_self_auto().map_err(|e| anyhow::anyhow!(e)),
     };
 
     if let Err(e) = result {

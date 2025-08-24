@@ -29,6 +29,9 @@ serde_json = "1.0"
 # File system
 dirs = "6.0"
 
+# Date/time for backups
+chrono = { version = "0.4", features = ["serde"] }
+
 # Archive handling - updated versions
 tar = "0.4"
 flate2 = "1.0"
