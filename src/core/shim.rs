@@ -72,7 +72,8 @@ impl ShimManager {
             }
         };
         
-        self.create_link(&binary_path, shim_path)?;
+        // Create a wrapper script instead of a direct link to prevent exec issues
+        self.create_wrapper_script(&binary_path, shim_path)?;
         Ok(())
     }
 
@@ -118,6 +119,39 @@ impl ShimManager {
         }
 
         Ok(false)
+    }
+
+    #[cfg(unix)]
+    fn create_wrapper_script(&self, binary_path: &Path, shim_path: &Path) -> Result<()> {
+        let script_content = format!(
+            "#!/bin/bash\nexec \"{}\" \"$@\"\n",
+            binary_path.display()
+        );
+        
+        std::fs::write(shim_path, script_content)?;
+        
+        // Make executable
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(shim_path)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(shim_path, perms)?;
+        
+        Ok(())
+    }
+    
+    #[cfg(windows)]
+    fn create_wrapper_script(&self, binary_path: &Path, shim_path: &Path) -> Result<()> {
+        // On Windows, create a .bat file
+        let mut shim_path = shim_path.to_path_buf();
+        shim_path.set_extension("bat");
+        
+        let script_content = format!(
+            "@echo off\n\"{}\" %*\n",
+            binary_path.display()
+        );
+        
+        std::fs::write(shim_path, script_content)?;
+        Ok(())
     }
 
     #[allow(dead_code)]
