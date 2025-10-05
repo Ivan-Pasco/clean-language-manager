@@ -174,6 +174,10 @@ impl Config {
         self.get_version_dir(version).join(binary_name)
     }
 
+    pub fn get_version_compile_options(&self, version: &str) -> PathBuf {
+        self.get_version_dir(version).join("compile-options.json")
+    }
+
     pub fn get_shim_path(&self) -> PathBuf {
         let binary_name = if cfg!(windows) { "cln.exe" } else { "cln" };
         self.get_bin_dir().join(binary_name)

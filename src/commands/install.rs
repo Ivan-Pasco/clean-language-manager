@@ -156,6 +156,17 @@ pub fn install_version(version: &str) -> Result<()> {
         std::fs::set_permissions(&binary_path, perms)?;
     }
 
+    // compile-options.json is stored per-version in the version directory
+    // The extraction already placed it there, just verify and inform the user
+    let options_path = version_dir.join("compile-options.json");
+    if options_path.exists() {
+        println!("✓ Found compile-options.json for version {clean_version}");
+    } else {
+        // This is just informational, not an error, since older releases may not have this file
+        println!("ℹ️  Note: compile-options.json not found in release package");
+        println!("   This is expected for compiler versions before dynamic options support.");
+    }
+
     // Clean up temporary files
     std::fs::remove_dir_all(&temp_dir)?;
 
