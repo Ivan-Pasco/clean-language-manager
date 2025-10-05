@@ -222,9 +222,9 @@ fn test_runtime_execution() -> Result<()> {
     let test_file = temp_dir.join("cleen_runtime_test.cln");
 
     // Write test program
-            std::fs::write(&test_file, test_program).map_err(|e| CleenError::ValidationError {
-            message: format!("Failed to create test file: {e}"),
-        })?;
+    std::fs::write(&test_file, test_program).map_err(|e| CleenError::ValidationError {
+        message: format!("Failed to create test file: {e}"),
+    })?;
 
     // Try to run the program
     let run_result = Command::new("cln")

@@ -22,8 +22,7 @@ fn default_true() -> bool {
 
 impl Default for Config {
     fn default() -> Self {
-        let cleen_dir =
-            get_cleen_dir().unwrap_or_else(|_| PathBuf::from(".cleen"));
+        let cleen_dir = get_cleen_dir().unwrap_or_else(|_| PathBuf::from(".cleen"));
 
         Config {
             active_version: None,

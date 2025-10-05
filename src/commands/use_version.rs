@@ -1,4 +1,8 @@
-use crate::core::{config::Config, shim::ShimManager, version::{VersionManager, normalize}};
+use crate::core::{
+    config::Config,
+    shim::ShimManager,
+    version::{normalize, VersionManager},
+};
 use crate::error::{CleenError, Result};
 
 pub fn use_version(version: &str) -> Result<()> {

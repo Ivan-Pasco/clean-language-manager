@@ -1,4 +1,4 @@
-use crate::core::{config::Config, github::GitHubClient, download::Downloader};
+use crate::core::{config::Config, download::Downloader, github::GitHubClient};
 use crate::error::{CleenError, Result};
 use std::{env, fs, path::Path};
 
@@ -39,15 +39,13 @@ pub fn update_self_auto() -> Result<()> {
     Ok(())
 }
 
-
 fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
     println!("🚀 Starting automatic update to {}...", release.tag_name);
 
     // Get current binary path
-    let current_exe = env::current_exe()
-        .map_err(|e| CleenError::UpdateError {
-            message: format!("Failed to get current executable path: {}", e),
-        })?;
+    let current_exe = env::current_exe().map_err(|e| CleenError::UpdateError {
+        message: format!("Failed to get current executable path: {}", e),
+    })?;
 
     println!("📍 Current binary: {}", current_exe.display());
 
@@ -68,7 +66,7 @@ fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
 
     let downloader = Downloader::new();
     let download_path = temp_dir.join(&asset.name);
-    
+
     println!("⬇️  Downloading {}...", asset.name);
     downloader
         .download_file(&asset.browser_download_url, &download_path)
@@ -78,16 +76,22 @@ fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
 
     // Extract or prepare binary
     let new_binary_path = prepare_new_binary(&download_path, &temp_dir, &asset.name)?;
-    
+
     // Replace current binary
     replace_current_binary(&current_exe, &new_binary_path, &backup_path)?;
 
     // Clean up
     let _ = fs::remove_dir_all(&temp_dir);
 
-    println!("✅ Successfully updated cleen to version {}", release.tag_name);
+    println!(
+        "✅ Successfully updated cleen to version {}",
+        release.tag_name
+    );
     println!("🔄 Please restart your terminal session to use the new version");
-    println!("📝 The previous version has been backed up to: {}", backup_path.display());
+    println!(
+        "📝 The previous version has been backed up to: {}",
+        backup_path.display()
+    );
 
     Ok(())
 }
@@ -114,17 +118,20 @@ fn get_platform_suffix() -> String {
     format!("{}-{}", os, arch)
 }
 
-fn find_update_asset<'a>(release: &'a crate::core::github::Release, platform_suffix: &str) -> Result<&'a crate::core::github::Asset> {
+fn find_update_asset<'a>(
+    release: &'a crate::core::github::Release,
+    platform_suffix: &str,
+) -> Result<&'a crate::core::github::Asset> {
     let binary_name = if cfg!(windows) { "cleen.exe" } else { "cleen" };
-    
+
     // Look for platform-specific asset
     release
         .assets
         .iter()
         .find(|asset| {
             let name_lower = asset.name.to_lowercase();
-            name_lower.contains(&platform_suffix.to_lowercase()) && 
-            (name_lower.contains("cleen") || name_lower == binary_name)
+            name_lower.contains(&platform_suffix.to_lowercase())
+                && (name_lower.contains("cleen") || name_lower == binary_name)
         })
         .or_else(|| {
             // Fallback: look for any cleen binary
@@ -150,18 +157,23 @@ fn create_backup(current_exe: &Path) -> Result<std::path::PathBuf> {
         chrono::Utc::now().format("%Y%m%d-%H%M%S"),
         if cfg!(windows) { "exe" } else { "bak" }
     );
-    
-    let backup_path = current_exe.parent()
+
+    let backup_path = current_exe
+        .parent()
         .unwrap_or_else(|| Path::new("."))
         .join(backup_name);
-        
+
     fs::copy(current_exe, &backup_path)?;
     Ok(backup_path)
 }
 
-fn prepare_new_binary(download_path: &Path, temp_dir: &Path, asset_name: &str) -> Result<std::path::PathBuf> {
+fn prepare_new_binary(
+    download_path: &Path,
+    temp_dir: &Path,
+    asset_name: &str,
+) -> Result<std::path::PathBuf> {
     let binary_name = if cfg!(windows) { "cleen.exe" } else { "cleen" };
-    
+
     if asset_name.ends_with(".tar.gz") || asset_name.ends_with(".zip") {
         println!("📦 Extracting archive...");
         let downloader = Downloader::new();
@@ -170,14 +182,14 @@ fn prepare_new_binary(download_path: &Path, temp_dir: &Path, asset_name: &str) -
             .map_err(|_| CleenError::UpdateError {
                 message: "Failed to extract archive".to_string(),
             })?;
-        
+
         // Find the binary in the extracted files
         find_binary_in_extracted_dir(temp_dir, binary_name)
     } else {
         // Direct binary download
         let binary_path = temp_dir.join(binary_name);
         fs::copy(download_path, &binary_path)?;
-        
+
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -185,7 +197,7 @@ fn prepare_new_binary(download_path: &Path, temp_dir: &Path, asset_name: &str) -
             perms.set_mode(0o755);
             fs::set_permissions(&binary_path, perms)?;
         }
-        
+
         Ok(binary_path)
     }
 }
@@ -194,7 +206,7 @@ fn find_binary_in_extracted_dir(dir: &Path, binary_name: &str) -> Result<std::pa
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             if let Ok(found) = find_binary_in_extracted_dir(&path, binary_name) {
                 return Ok(found);
@@ -210,25 +222,29 @@ fn find_binary_in_extracted_dir(dir: &Path, binary_name: &str) -> Result<std::pa
             return Ok(path);
         }
     }
-    
+
     Err(CleenError::UpdateError {
         message: format!("Binary '{}' not found in extracted archive", binary_name),
     })
 }
 
-fn replace_current_binary(current_exe: &Path, new_binary: &Path, _backup_path: &Path) -> Result<()> {
+fn replace_current_binary(
+    current_exe: &Path,
+    new_binary: &Path,
+    _backup_path: &Path,
+) -> Result<()> {
     println!("🔄 Replacing current binary...");
-    
+
     #[cfg(windows)]
     {
         // On Windows, we can't replace a running executable directly
         // We need to use a different approach
         let temp_name = format!("{}.old", current_exe.to_string_lossy());
         let temp_path = Path::new(&temp_name);
-        
+
         // Move current exe to temp location
         fs::rename(current_exe, temp_path)?;
-        
+
         // Copy new binary to current location
         match fs::copy(new_binary, current_exe) {
             Ok(_) => {
@@ -244,19 +260,19 @@ fn replace_current_binary(current_exe: &Path, new_binary: &Path, _backup_path: &
             }
         }
     }
-    
+
     #[cfg(unix)]
     {
         // On Unix, we can replace the binary directly
         fs::copy(new_binary, current_exe)?;
-        
+
         // Ensure it's executable
         use std::os::unix::fs::PermissionsExt;
         let mut perms = fs::metadata(current_exe)?.permissions();
         perms.set_mode(0o755);
         fs::set_permissions(current_exe, perms)?;
     }
-    
+
     Ok(())
 }
 

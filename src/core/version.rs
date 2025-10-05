@@ -97,13 +97,13 @@ impl VersionManager {
 
     pub fn is_version_installed(&self, version: &str) -> bool {
         let clean_version = normalize::to_clean_version(version);
-        
+
         // First check the clean version directory
         let binary_path = self.config.get_version_binary(&clean_version);
         if binary_path.exists() {
             return true;
         }
-        
+
         // For backward compatibility, also check the v-prefixed directory
         let v_version = normalize::to_github_version(&clean_version);
         let v_binary_path = self.config.get_version_binary(&v_version);
