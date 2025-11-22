@@ -1,6 +1,6 @@
 [package]
 name = "cleen"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Clean Language Team"]
 edition = "2021"
 description = "A version manager for Clean Language compiler"
