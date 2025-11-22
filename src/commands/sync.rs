@@ -34,8 +34,8 @@ pub fn sync_project_version() -> Result<()> {
                 println!("📦 Version {project_version} is not installed, installing now...");
                 println!();
 
-                // Install the version
-                match install::install_version(&project_version) {
+                // Install the version (skip Frame prompt during sync)
+                match install::install_version(&project_version, false, true) {
                     Ok(_) => {
                         println!();
                         println!("🎉 Successfully synced project version!");

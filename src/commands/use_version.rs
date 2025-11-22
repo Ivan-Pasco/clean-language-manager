@@ -1,11 +1,18 @@
 use crate::core::{
     config::Config,
+    frame,
     shim::ShimManager,
     version::{normalize, VersionManager},
 };
 use crate::error::{CleenError, Result};
 
-pub fn use_version(version: &str) -> Result<()> {
+pub fn use_version(version: &str, is_frame: bool) -> Result<()> {
+    if is_frame {
+        // Switch Frame CLI version
+        return frame::use_frame_version(version);
+    }
+
+    // Switch compiler version
     let mut config = Config::load()?;
     let version_manager = VersionManager::new(config.clone());
 

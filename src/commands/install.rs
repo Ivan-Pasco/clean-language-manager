@@ -1,8 +1,9 @@
-use crate::core::{config::Config, download::Downloader, github::GitHubClient, version::normalize};
+use crate::core::{config::Config, download::Downloader, frame, github::GitHubClient, version::normalize};
 use crate::error::{CleenError, Result};
+use dialoguer::Confirm;
 use std::path::Path;
 
-pub fn install_version(version: &str) -> Result<()> {
+pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Result<()> {
     println!("Installing Clean Language version: {version}");
 
     let config = Config::load()?;
@@ -190,6 +191,43 @@ pub fn install_version(version: &str) -> Result<()> {
     println!();
     println!("To use this version, run:");
     println!("   cleen use {clean_version}");
+
+    // Offer Frame CLI installation
+    let config = Config::load()?;
+    if !no_frame && config.auto_offer_frame {
+        let should_install_frame = if with_frame {
+            true
+        } else {
+            // Interactive prompt
+            println!();
+            match Confirm::new()
+                .with_prompt("Would you like to install Frame CLI as well?")
+                .default(true)
+                .interact()
+            {
+                Ok(response) => response,
+                Err(_) => false,
+            }
+        };
+
+        if should_install_frame {
+            println!();
+            println!("Installing Frame CLI...");
+            match frame::install_frame(None, false) {
+                Ok(_) => {
+                    println!();
+                    println!("✅ Installation complete!");
+                    println!("   cln --version");
+                    println!("   frame --version");
+                }
+                Err(e) => {
+                    eprintln!();
+                    eprintln!("⚠️  Failed to install Frame CLI: {e}");
+                    eprintln!("   You can install it later with: cleen frame install");
+                }
+            }
+        }
+    }
 
     Ok(())
 }

@@ -1,8 +1,15 @@
-use crate::core::config::Config;
+use crate::core::{compatibility, config::Config, frame};
 use crate::error::{CleenError, Result};
+use dialoguer::Confirm;
 use std::io::{self, Write};
 
-pub fn uninstall_version(version: &str) -> Result<()> {
+pub fn uninstall_version(version: &str, is_frame: bool, force: bool) -> Result<()> {
+    if is_frame {
+        // Uninstall Frame CLI
+        return frame::uninstall_frame_version(version);
+    }
+
+    // Uninstall compiler version
     println!("Uninstalling Clean Language version: {version}");
 
     let mut config = Config::load()?;
@@ -13,6 +20,38 @@ pub fn uninstall_version(version: &str) -> Result<()> {
         return Err(CleenError::VersionNotFound {
             version: version.to_string(),
         });
+    }
+
+    // Check if Frame depends on this compiler version
+    if !force {
+        if let Some(frame_version) = &config.frame_version {
+            let compat_matrix = compatibility::CompatibilityMatrix::new();
+            if let Some(required_compiler) = compat_matrix.get_required_compiler_version(frame_version) {
+                // Check if this compiler version is required for the installed Frame
+                if compatibility::is_version_gte(version, &required_compiler) {
+                    // Frame might depend on this compiler
+                    println!("⚠️  Frame CLI {} may depend on this compiler version", frame_version);
+                    println!("   Uninstalling may cause Frame CLI to stop working.");
+                    println!();
+
+                    match Confirm::new()
+                        .with_prompt("Do you want to continue anyway?")
+                        .default(false)
+                        .interact()
+                    {
+                        Ok(true) => {
+                            // Continue with uninstall
+                        }
+                        _ => {
+                            println!("Uninstall cancelled.");
+                            println!();
+                            println!("To force uninstall: cleen uninstall {} --force", version);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Check if this is the currently active version

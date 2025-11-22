@@ -58,6 +58,28 @@ pub enum CleenError {
 
     #[error("Update error: {message}")]
     UpdateError { message: String },
+
+    #[error("Frame CLI version '{frame_version}' not found")]
+    FrameVersionNotFound { frame_version: String },
+
+    #[error("Frame CLI version '{frame_version}' is already installed")]
+    FrameVersionAlreadyInstalled { frame_version: String },
+
+    #[error("Frame CLI {frame_version} requires compiler >= {required_compiler}, but current compiler is {current_compiler}")]
+    FrameIncompatible {
+        frame_version: String,
+        required_compiler: String,
+        current_compiler: String,
+    },
+
+    #[error("No compiler installed. Frame CLI requires a Clean Language compiler to be installed first")]
+    NoCompilerForFrame,
+
+    #[error("Cannot uninstall compiler {compiler_version}: Frame CLI {frame_version} depends on it")]
+    FrameDependsOnCompiler {
+        compiler_version: String,
+        frame_version: String,
+    },
 }
 
 impl From<anyhow::Error> for CleenError {

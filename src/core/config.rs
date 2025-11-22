@@ -7,11 +7,15 @@ use std::path::PathBuf;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub active_version: Option<String>,
+    #[serde(default)]
+    pub frame_version: Option<String>,
     pub cleen_dir: PathBuf,
     pub auto_cleanup: bool,
     pub github_api_token: Option<String>,
     #[serde(default = "default_true")]
     pub check_updates: bool,
+    #[serde(default = "default_true")]
+    pub auto_offer_frame: bool,
     pub last_update_check: Option<String>,
     pub last_self_update_check: Option<String>,
 }
@@ -26,10 +30,12 @@ impl Default for Config {
 
         Config {
             active_version: None,
+            frame_version: None,
             cleen_dir,
             auto_cleanup: false,
             github_api_token: None,
             check_updates: true,
+            auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
         }
@@ -42,10 +48,12 @@ impl Config {
 
         Ok(Config {
             active_version: None,
+            frame_version: None,
             cleen_dir,
             auto_cleanup: false,
             github_api_token: std::env::var("GITHUB_TOKEN").ok(),
             check_updates: true,
+            auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
         })
@@ -246,6 +254,30 @@ impl Config {
 
         self.last_self_update_check = Some(now);
         self.save()
+    }
+
+    // Frame CLI specific methods
+
+    /// Get the Frame versions directory (~/.cleen/versions/frame/)
+    pub fn get_frame_versions_dir(&self) -> PathBuf {
+        self.get_versions_dir().join("frame")
+    }
+
+    /// Get the directory for a specific Frame CLI version
+    pub fn get_frame_version_dir(&self, version: &str) -> PathBuf {
+        self.get_frame_versions_dir().join(version)
+    }
+
+    /// Get the binary path for a specific Frame CLI version
+    pub fn get_frame_version_binary(&self, version: &str) -> PathBuf {
+        let binary_name = if cfg!(windows) { "frame.exe" } else { "frame" };
+        self.get_frame_version_dir(version).join(binary_name)
+    }
+
+    /// Get the Frame CLI shim path
+    pub fn get_frame_shim_path(&self) -> PathBuf {
+        let binary_name = if cfg!(windows) { "frame.exe" } else { "frame" };
+        self.get_bin_dir().join(binary_name)
     }
 }
 

@@ -1,9 +1,9 @@
-use crate::core::{config::Config, shim::ShimManager, version::VersionManager};
+use crate::core::{compatibility, config::Config, frame, shim::ShimManager, version::VersionManager};
 use crate::error::{CleenError, Result};
 use std::env;
 use std::process::Command;
 
-pub fn check_environment() -> Result<()> {
+pub fn check_environment(check_frame: bool) -> Result<()> {
     println!("🔍 Clean Language Manager - Environment Check");
     println!();
 
@@ -180,6 +180,95 @@ pub fn check_environment() -> Result<()> {
     }
 
     println!();
+
+    // Check Frame CLI if requested or if installed
+    let frame_versions = frame::list_frame_versions(&config).unwrap_or_default();
+    if check_frame || !frame_versions.is_empty() {
+        println!("🚀 Frame CLI:");
+
+        if frame_versions.is_empty() {
+            println!("  ⚠️  No Frame CLI versions installed");
+            if check_frame {
+                println!("    To install: cleen frame install");
+            }
+        } else {
+            println!("  Installed versions:");
+            for version in &frame_versions {
+                let is_active = config.frame_version.as_deref() == Some(version);
+                let marker = if is_active { "✅" } else { "  " };
+                println!("    {marker} {version}");
+            }
+
+            if let Some(active_frame) = &config.frame_version {
+                println!();
+                println!("  Active Frame version: {active_frame}");
+
+                // Check Frame binary
+                let frame_binary = config.get_frame_version_binary(active_frame);
+                if frame_binary.exists() {
+                    println!("    ✅ Binary exists: {frame_binary:?}");
+
+                    // Test Frame command
+                    match Command::new(&frame_binary).arg("--version").output() {
+                        Ok(output) => {
+                            if output.status.success() {
+                                let version_output = String::from_utf8_lossy(&output.stdout);
+                                println!("    ✅ 'frame --version' works: {}", version_output.trim());
+                            } else {
+                                println!("    ❌ 'frame --version' failed");
+                                issues_found += 1;
+                            }
+                        }
+                        Err(_) => {
+                            println!("    ❌ Failed to execute Frame binary");
+                            issues_found += 1;
+                        }
+                    }
+                } else {
+                    println!("    ❌ Binary missing: {frame_binary:?}");
+                    issues_found += 1;
+                }
+
+                // Check compatibility with compiler
+                if let Some(compiler_version) = &config.active_version {
+                    println!();
+                    println!("  Compatibility check:");
+                    match compatibility::check_frame_compatibility(compiler_version, active_frame) {
+                        Ok(_) => {
+                            println!("    ✅ Frame CLI {active_frame} is compatible with compiler {compiler_version}");
+                        }
+                        Err(e) => {
+                            println!("    ⚠️  {e}");
+                            println!("      Frame CLI may not work correctly");
+                        }
+                    }
+                } else {
+                    println!();
+                    println!("  ⚠️  No compiler active - Frame CLI requires a compiler");
+                }
+
+                // Check Frame shim
+                let frame_shim = config.get_frame_shim_path();
+                if frame_shim.exists() {
+                    println!();
+                    println!("  Shim: {frame_shim:?}");
+                    println!("    ✅ Frame shim exists");
+                } else {
+                    println!();
+                    println!("  Shim: {frame_shim:?}");
+                    println!("    ❌ Frame shim missing");
+                    println!("      Run: cleen frame use {active_frame}");
+                    issues_found += 1;
+                }
+            } else {
+                println!();
+                println!("  ⚠️  No active Frame version");
+                println!("    To activate: cleen frame use <version>");
+            }
+        }
+
+        println!();
+    }
 
     // Summary
     if issues_found == 0 {
