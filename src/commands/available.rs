@@ -12,9 +12,11 @@ pub fn list_available_versions() -> Result<()> {
             } else {
                 println!("Available versions:");
 
-                for (i, release) in releases.iter().enumerate() {
+                // Reverse the order so newest version appears at the bottom (next to cursor)
+                for (i, release) in releases.iter().rev().enumerate() {
                     let clean_version = normalize::to_clean_version(&release.tag_name);
-                    let status = if i == 0 { " (latest)" } else { "" };
+                    // Latest is now at the end (last index)
+                    let status = if i == releases.len() - 1 { " (latest)" } else { "" };
                     let prerelease = if release.prerelease {
                         " [prerelease]"
                     } else {

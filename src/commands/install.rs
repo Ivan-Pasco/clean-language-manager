@@ -84,23 +84,27 @@ pub fn install_version(version: &str) -> Result<()> {
     let platform_suffix = get_platform_suffix();
     println!("Looking for asset matching platform: {platform_suffix}");
 
+    // PRIORITY 1: Find tarball/zip for the platform (contains binary + compile-options.json)
     let asset = release
         .assets
         .iter()
         .find(|asset| {
             let name_lower = asset.name.to_lowercase();
-            name_lower.contains(&platform_suffix.to_lowercase())
+            let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
                 || name_lower.contains("universal")
-                || name_lower.contains("any")
+                || name_lower.contains("any");
+            let is_archive = name_lower.ends_with(".tar.gz") || name_lower.ends_with(".zip");
+            matches_platform && is_archive
         })
+        // PRIORITY 2: Fallback to direct binary (for backward compatibility)
         .or_else(|| {
-            // Fallback: try to find any executable asset
             release.assets.iter().find(|asset| {
-                let name = &asset.name;
-                name.ends_with(".exe")
-                    || name.ends_with(".tar.gz")
-                    || name.ends_with(".zip")
-                    || name.contains("cln")
+                let name_lower = asset.name.to_lowercase();
+                let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
+                    || name_lower.contains("universal")
+                    || name_lower.contains("any");
+                let is_binary = name_lower.contains("cln") && !name_lower.ends_with(".json");
+                matches_platform && is_binary
             })
         })
         .ok_or_else(|| {

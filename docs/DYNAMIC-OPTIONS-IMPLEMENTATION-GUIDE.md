@@ -1,4 +1,4 @@
-# Dynamic Compile Options - Complete Implementation Guide
+cl# Dynamic Compile Options - Complete Implementation Guide
 
 **Author:** Ivan Pasco
 **Date:** January 2025
@@ -503,9 +503,48 @@ pub fn get_version_compile_options(&self, version: &str) -> PathBuf {
 }
 ```
 
-### Step 3.2: Update Install Command
+### Step 3.2: Update Install Command to Prefer Tarballs
 
 **Edit:** `src/commands/install.rs`
+
+**CRITICAL FIX:** The download logic must prefer tarballs (`.tar.gz` or `.zip`) over direct binaries, since tarballs contain both the binary AND `compile-options.json`.
+
+Around line 83-118, update the asset selection logic:
+
+```rust
+// PRIORITY 1: Find tarball/zip for the platform (contains binary + compile-options.json)
+let asset = release
+    .assets
+    .iter()
+    .find(|asset| {
+        let name_lower = asset.name.to_lowercase();
+        let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
+            || name_lower.contains("universal")
+            || name_lower.contains("any");
+        let is_archive = name_lower.ends_with(".tar.gz") || name_lower.ends_with(".zip");
+        matches_platform && is_archive
+    })
+    // PRIORITY 2: Fallback to direct binary (for backward compatibility)
+    .or_else(|| {
+        release.assets.iter().find(|asset| {
+            let name_lower = asset.name.to_lowercase();
+            let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
+                || name_lower.contains("universal")
+                || name_lower.contains("any");
+            let is_binary = name_lower.contains("cln") && !name_lower.ends_with(".json");
+            matches_platform && is_binary
+        })
+    })
+    .ok_or_else(|| {
+        println!("Available assets:");
+        for asset in &release.assets {
+            println!("  • {}", asset.name);
+        }
+        CleenError::BinaryNotFound {
+            name: format!("Asset for platform {platform_suffix} (or universal binary)"),
+        }
+    })?;
+```
 
 After the binary extraction and permission setup (around line 159), add:
 
