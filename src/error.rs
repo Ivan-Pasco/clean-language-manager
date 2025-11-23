@@ -80,6 +80,7 @@ pub enum CleenError {
     #[error(
         "Cannot uninstall compiler {compiler_version}: Frame CLI {frame_version} depends on it"
     )]
+    #[allow(dead_code)]
     FrameDependsOnCompiler {
         compiler_version: String,
         frame_version: String,

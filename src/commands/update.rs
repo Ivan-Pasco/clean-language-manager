@@ -31,7 +31,7 @@ pub fn update_self_auto() -> Result<()> {
     );
     println!();
 
-    perform_auto_update(&latest_release)?;
+    perform_auto_update(latest_release)?;
 
     let mut config = Config::load()?;
     config.update_last_self_check_time()?;

@@ -89,7 +89,7 @@ fn parse_version(version: &str) -> [u32; 3] {
     let parts: Vec<&str> = normalized.split('.').collect();
 
     [
-        parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0),
+        parts.first().and_then(|s| s.parse().ok()).unwrap_or(0),
         parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0),
         parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0),
     ]

@@ -78,6 +78,7 @@ impl ShimManager {
     }
 
     #[cfg(unix)]
+    #[allow(dead_code)]
     fn create_link(&self, target: &Path, link: &Path) -> Result<()> {
         std::os::unix::fs::symlink(target, link)?;
         Ok(())

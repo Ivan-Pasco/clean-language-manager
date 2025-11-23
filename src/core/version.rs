@@ -10,8 +10,8 @@ pub mod normalize {
     pub fn to_clean_version(version: &str) -> String {
         if version == "latest" {
             version.to_string()
-        } else if version.starts_with('v') {
-            version[1..].to_string()
+        } else if let Some(stripped) = version.strip_prefix('v') {
+            stripped.to_string()
         } else {
             version.to_string()
         }
@@ -20,9 +20,7 @@ pub mod normalize {
     /// Convert a clean version to GitHub release format by adding 'v' prefix if needed
     /// Examples: "0.6.2" -> "v0.6.2", "v0.6.2" -> "v0.6.2", "latest" -> "latest"
     pub fn to_github_version(version: &str) -> String {
-        if version == "latest" {
-            version.to_string()
-        } else if version.starts_with('v') {
+        if version == "latest" || version.starts_with('v') {
             version.to_string()
         } else {
             format!("v{}", version)
@@ -30,6 +28,7 @@ pub mod normalize {
     }
 
     /// Check if two versions are equivalent (ignoring v prefix)
+    #[allow(dead_code)]
     pub fn versions_equal(a: &str, b: &str) -> bool {
         to_clean_version(a) == to_clean_version(b)
     }

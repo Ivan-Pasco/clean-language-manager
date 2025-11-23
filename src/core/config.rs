@@ -181,6 +181,7 @@ impl Config {
         self.get_version_dir(version).join(binary_name)
     }
 
+    #[allow(dead_code)]
     pub fn get_version_compile_options(&self, version: &str) -> PathBuf {
         self.get_version_dir(version).join("compile-options.json")
     }

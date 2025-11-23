@@ -202,14 +202,11 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
         } else {
             // Interactive prompt
             println!();
-            match Confirm::new()
+            Confirm::new()
                 .with_prompt("Would you like to install Frame CLI as well?")
                 .default(true)
                 .interact()
-            {
-                Ok(response) => response,
-                Err(_) => false,
-            }
+                .unwrap_or_default()
         };
 
         if should_install_frame {
