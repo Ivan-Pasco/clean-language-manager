@@ -144,8 +144,8 @@ fn main() -> Result<()> {
             }
             FrameCommands::List => {
                 let config = core::config::Config::load().map_err(|e| anyhow::anyhow!(e))?;
-                let versions = core::frame::list_frame_versions(&config)
-                    .map_err(|e| anyhow::anyhow!(e))?;
+                let versions =
+                    core::frame::list_frame_versions(&config).map_err(|e| anyhow::anyhow!(e))?;
 
                 if versions.is_empty() {
                     println!("No Frame CLI versions installed");

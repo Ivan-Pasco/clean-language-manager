@@ -26,11 +26,16 @@ pub fn uninstall_version(version: &str, is_frame: bool, force: bool) -> Result<(
     if !force {
         if let Some(frame_version) = &config.frame_version {
             let compat_matrix = compatibility::CompatibilityMatrix::new();
-            if let Some(required_compiler) = compat_matrix.get_required_compiler_version(frame_version) {
+            if let Some(required_compiler) =
+                compat_matrix.get_required_compiler_version(frame_version)
+            {
                 // Check if this compiler version is required for the installed Frame
                 if compatibility::is_version_gte(version, &required_compiler) {
                     // Frame might depend on this compiler
-                    println!("⚠️  Frame CLI {} may depend on this compiler version", frame_version);
+                    println!(
+                        "⚠️  Frame CLI {} may depend on this compiler version",
+                        frame_version
+                    );
                     println!("   Uninstalling may cause Frame CLI to stop working.");
                     println!();
 

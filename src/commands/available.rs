@@ -16,7 +16,11 @@ pub fn list_available_versions() -> Result<()> {
                 for (i, release) in releases.iter().rev().enumerate() {
                     let clean_version = normalize::to_clean_version(&release.tag_name);
                     // Latest is now at the end (last index)
-                    let status = if i == releases.len() - 1 { " (latest)" } else { "" };
+                    let status = if i == releases.len() - 1 {
+                        " (latest)"
+                    } else {
+                        ""
+                    };
                     let prerelease = if release.prerelease {
                         " [prerelease]"
                     } else {

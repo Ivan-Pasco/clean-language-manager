@@ -72,10 +72,14 @@ pub enum CleenError {
         current_compiler: String,
     },
 
-    #[error("No compiler installed. Frame CLI requires a Clean Language compiler to be installed first")]
+    #[error(
+        "No compiler installed. Frame CLI requires a Clean Language compiler to be installed first"
+    )]
     NoCompilerForFrame,
 
-    #[error("Cannot uninstall compiler {compiler_version}: Frame CLI {frame_version} depends on it")]
+    #[error(
+        "Cannot uninstall compiler {compiler_version}: Frame CLI {frame_version} depends on it"
+    )]
     FrameDependsOnCompiler {
         compiler_version: String,
         frame_version: String,

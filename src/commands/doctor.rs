@@ -1,4 +1,6 @@
-use crate::core::{compatibility, config::Config, frame, shim::ShimManager, version::VersionManager};
+use crate::core::{
+    compatibility, config::Config, frame, shim::ShimManager, version::VersionManager,
+};
 use crate::error::{CleenError, Result};
 use std::env;
 use std::process::Command;
@@ -213,7 +215,10 @@ pub fn check_environment(check_frame: bool) -> Result<()> {
                         Ok(output) => {
                             if output.status.success() {
                                 let version_output = String::from_utf8_lossy(&output.stdout);
-                                println!("    ✅ 'frame --version' works: {}", version_output.trim());
+                                println!(
+                                    "    ✅ 'frame --version' works: {}",
+                                    version_output.trim()
+                                );
                             } else {
                                 println!("    ❌ 'frame --version' failed");
                                 issues_found += 1;

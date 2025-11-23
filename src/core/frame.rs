@@ -31,7 +31,9 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 v
             }
             None => {
-                println!("⚠️  No compatible Frame CLI version found for compiler {compiler_version}");
+                println!(
+                    "⚠️  No compatible Frame CLI version found for compiler {compiler_version}"
+                );
                 println!("   Frame CLI 0.1.0 requires compiler >= 0.14.0");
                 println!();
                 println!("To upgrade your compiler:");
@@ -73,7 +75,9 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         Ok(releases) => releases,
         Err(e) => {
             println!("⚠️  Unable to fetch releases from GitHub: {e}");
-            println!("   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases");
+            println!(
+                "   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases"
+            );
             return Ok(());
         }
     };
@@ -86,15 +90,18 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
     // Find the specified version (with or without 'v' prefix)
     let tag_name = format!("v{}", frame_version.trim_start_matches('v'));
-    let release = releases.iter().find(|r| r.tag_name == tag_name).ok_or_else(|| {
-        println!("Available Frame CLI versions:");
-        for r in &releases {
-            println!("  • {}", r.tag_name.trim_start_matches('v'));
-        }
-        CleenError::FrameVersionNotFound {
-            frame_version: frame_version.clone(),
-        }
-    })?;
+    let release = releases
+        .iter()
+        .find(|r| r.tag_name == tag_name)
+        .ok_or_else(|| {
+            println!("Available Frame CLI versions:");
+            for r in &releases {
+                println!("  • {}", r.tag_name.trim_start_matches('v'));
+            }
+            CleenError::FrameVersionNotFound {
+                frame_version: frame_version.clone(),
+            }
+        })?;
 
     // Find appropriate asset for current platform
     let platform_suffix = get_platform_suffix();

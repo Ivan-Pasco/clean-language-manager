@@ -96,10 +96,7 @@ fn parse_version(version: &str) -> [u32; 3] {
 }
 
 /// Validate that a compiler version is compatible with the given Frame version
-pub fn check_frame_compatibility(
-    compiler_version: &str,
-    frame_version: &str,
-) -> Result<()> {
+pub fn check_frame_compatibility(compiler_version: &str, frame_version: &str) -> Result<()> {
     let matrix = CompatibilityMatrix::new();
 
     if !matrix.is_compatible(compiler_version, frame_version) {

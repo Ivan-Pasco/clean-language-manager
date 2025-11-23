@@ -1,4 +1,6 @@
-use crate::core::{config::Config, download::Downloader, frame, github::GitHubClient, version::normalize};
+use crate::core::{
+    config::Config, download::Downloader, frame, github::GitHubClient, version::normalize,
+};
 use crate::error::{CleenError, Result};
 use dialoguer::Confirm;
 use std::path::Path;
