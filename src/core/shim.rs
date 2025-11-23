@@ -85,6 +85,7 @@ impl ShimManager {
     }
 
     #[cfg(windows)]
+    #[allow(dead_code)]
     fn create_link(&self, target: &Path, link: &Path) -> Result<()> {
         // On Windows, copy the file instead of symlinking
         std::fs::copy(target, link)?;
