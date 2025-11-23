@@ -64,30 +64,42 @@ fn perform_auto_update(release: &crate::core::github::Release) -> Result<()> {
     let temp_dir = env::temp_dir().join(format!("cleen-update-{}", release.tag_name));
     fs::create_dir_all(&temp_dir)?;
 
-    let downloader = Downloader::new();
-    let download_path = temp_dir.join(&asset.name);
+    // Ensure temp dir is cleaned up on any error
+    let result = (|| -> Result<()> {
+        let downloader = Downloader::new();
+        let download_path = temp_dir.join(&asset.name);
 
-    println!("⬇️  Downloading {}...", asset.name);
-    downloader
-        .download_file(&asset.browser_download_url, &download_path)
-        .map_err(|_| CleenError::UpdateError {
-            message: "Failed to download update".to_string(),
-        })?;
+        println!("⬇️  Downloading {}...", asset.name);
+        downloader
+            .download_file(&asset.browser_download_url, &download_path)
+            .map_err(|e| CleenError::UpdateError {
+                message: format!("Failed to download update: {}", e),
+            })?;
 
-    // Extract or prepare binary
-    let new_binary_path = prepare_new_binary(&download_path, &temp_dir, &asset.name)?;
+        // Extract or prepare binary
+        let new_binary_path = prepare_new_binary(&download_path, &temp_dir, &asset.name)?;
 
-    // Replace current binary
-    replace_current_binary(&current_exe, &new_binary_path, &backup_path)?;
+        // Validate the new binary before replacing
+        println!("🔍 Validating new binary...");
+        validate_new_binary(&new_binary_path)?;
 
-    // Clean up
+        // Replace current binary
+        replace_current_binary(&current_exe, &new_binary_path, &backup_path)?;
+
+        Ok(())
+    })();
+
+    // Always clean up temp directory
     let _ = fs::remove_dir_all(&temp_dir);
+
+    // Check result after cleanup
+    result?;
 
     println!(
         "✅ Successfully updated cleen to version {}",
         release.tag_name
     );
-    println!("🔄 Please restart your terminal session to use the new version");
+    println!("🔄 Please restart your terminal or run a new shell to use the new version");
     println!(
         "📝 The previous version has been backed up to: {}",
         backup_path.display()
@@ -263,16 +275,75 @@ fn replace_current_binary(
 
     #[cfg(unix)]
     {
-        // On Unix, we can replace the binary directly
-        fs::copy(new_binary, current_exe)?;
+        // On Unix, use atomic rename for safer replacement
+        // First copy to a temp location with correct permissions
+        let temp_name = format!("{}.new", current_exe.to_string_lossy());
+        let temp_path = Path::new(&temp_name);
+
+        fs::copy(new_binary, temp_path)?;
 
         // Ensure it's executable
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(current_exe)?.permissions();
+        let mut perms = fs::metadata(temp_path)?.permissions();
         perms.set_mode(0o755);
-        fs::set_permissions(current_exe, perms)?;
+        fs::set_permissions(temp_path, perms)?;
+
+        // Atomically replace the old binary with the new one
+        // This is safe even while the old binary is running
+        fs::rename(temp_path, current_exe)?;
     }
 
+    Ok(())
+}
+
+fn validate_new_binary(binary_path: &Path) -> Result<()> {
+    use std::process::Command;
+
+    // Check 1: Binary exists
+    if !binary_path.exists() {
+        return Err(CleenError::UpdateError {
+            message: "New binary does not exist".to_string(),
+        });
+    }
+
+    // Check 2: Binary is executable (Unix)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = fs::metadata(binary_path)?;
+        let permissions = metadata.permissions();
+        if permissions.mode() & 0o111 == 0 {
+            return Err(CleenError::UpdateError {
+                message: "New binary is not executable".to_string(),
+            });
+        }
+    }
+
+    // Check 3: Try running --version to verify it works
+    let output = Command::new(binary_path)
+        .arg("--version")
+        .output()
+        .map_err(|e| CleenError::UpdateError {
+            message: format!("Failed to execute new binary: {}", e),
+        })?;
+
+    if !output.status.success() {
+        return Err(CleenError::UpdateError {
+            message: format!(
+                "New binary failed to execute (exit code: {:?})",
+                output.status.code()
+            ),
+        });
+    }
+
+    let version_output = String::from_utf8_lossy(&output.stdout);
+    if !version_output.to_lowercase().contains("cleen") {
+        return Err(CleenError::UpdateError {
+            message: "New binary does not appear to be cleen".to_string(),
+        });
+    }
+
+    println!("  ✅ Binary validated successfully");
     Ok(())
 }
 
