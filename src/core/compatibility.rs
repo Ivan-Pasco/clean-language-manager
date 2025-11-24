@@ -11,9 +11,12 @@ impl Default for CompatibilityMatrix {
     fn default() -> Self {
         let mut mappings = HashMap::new();
 
-        // Frame 0.1.0 requires compiler >= 0.14.0
-        mappings.insert("0.14.0".to_string(), vec!["0.1.0".to_string()]);
-        mappings.insert("0.15.0".to_string(), vec!["0.1.0".to_string()]);
+        // Frame 1.0.0 requires compiler >= 0.14.0
+        mappings.insert("0.14.0".to_string(), vec!["1.0.0".to_string()]);
+        mappings.insert("0.15.0".to_string(), vec!["1.0.0".to_string()]);
+
+        // Frame 2.0.0 for future compiler versions
+        mappings.insert("0.16.0".to_string(), vec!["2.0.0".to_string()]);
 
         Self { mappings }
     }
@@ -35,9 +38,13 @@ impl CompatibilityMatrix {
         }
 
         // Check if compiler version is greater than any minimum required version
-        // For now, if compiler is >= 0.14.0, Frame 0.1.0 is compatible
+        // For compiler >= 0.16.0, use Frame 2.0.0
+        if is_version_gte(normalized, "0.16.0") {
+            return Some("2.0.0".to_string());
+        }
+        // For compiler >= 0.14.0, use Frame 1.0.0
         if is_version_gte(normalized, "0.14.0") {
-            return Some("0.1.0".to_string());
+            return Some("1.0.0".to_string());
         }
 
         None
@@ -47,12 +54,15 @@ impl CompatibilityMatrix {
     pub fn get_required_compiler_version(&self, frame_version: &str) -> Option<String> {
         let normalized = frame_version.trim_start_matches('v');
 
-        // Frame 0.1.0 requires compiler >= 0.14.0
-        if normalized == "0.1.0" {
-            return Some("0.14.0".to_string());
+        match normalized {
+            // Frame 1.0.0 requires compiler >= 0.14.0
+            "1.0.0" => Some("0.14.0".to_string()),
+            // Frame 2.0.0 requires compiler >= 0.16.0
+            "2.0.0" => Some("0.16.0".to_string()),
+            // Legacy support for 0.1.0 if it exists
+            "0.1.0" => Some("0.14.0".to_string()),
+            _ => None,
         }
-
-        None
     }
 
     /// Check if a compiler version is compatible with a Frame version
@@ -138,23 +148,37 @@ mod tests {
     fn test_compatibility_matrix() {
         let matrix = CompatibilityMatrix::new();
 
-        assert!(matrix.is_compatible("0.14.0", "0.1.0"));
-        assert!(matrix.is_compatible("0.15.0", "0.1.0"));
-        assert!(!matrix.is_compatible("0.13.0", "0.1.0"));
+        // Frame 1.0.0 compatibility
+        assert!(matrix.is_compatible("0.14.0", "1.0.0"));
+        assert!(matrix.is_compatible("0.15.0", "1.0.0"));
+        assert!(!matrix.is_compatible("0.13.0", "1.0.0"));
+
+        // Frame 2.0.0 compatibility
+        assert!(matrix.is_compatible("0.16.0", "2.0.0"));
+        assert!(!matrix.is_compatible("0.15.0", "2.0.0"));
     }
 
     #[test]
     fn test_find_compatible_frame() {
         let matrix = CompatibilityMatrix::new();
 
+        // Compiler 0.14.x and 0.15.x should use Frame 1.0.0
         assert_eq!(
             matrix.find_compatible_frame_version("0.14.0"),
-            Some("0.1.0".to_string())
+            Some("1.0.0".to_string())
         );
         assert_eq!(
             matrix.find_compatible_frame_version("0.15.0"),
-            Some("0.1.0".to_string())
+            Some("1.0.0".to_string())
         );
+
+        // Compiler 0.16.x and above should use Frame 2.0.0
+        assert_eq!(
+            matrix.find_compatible_frame_version("0.16.0"),
+            Some("2.0.0".to_string())
+        );
+
+        // Compiler below 0.14.0 should have no compatible Frame version
         assert_eq!(matrix.find_compatible_frame_version("0.13.0"), None);
     }
 }

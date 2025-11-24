@@ -34,12 +34,14 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 println!(
                     "⚠️  No compatible Frame CLI version found for compiler {compiler_version}"
                 );
-                println!("   Frame CLI 0.1.0 requires compiler >= 0.14.0");
+                println!("   Frame CLI requires compiler >= 0.14.0");
+                println!("   • Frame 1.0.0 requires compiler >= 0.14.0");
+                println!("   • Frame 2.0.0 requires compiler >= 0.16.0");
                 println!();
                 println!("To upgrade your compiler:");
-                println!("   cleen install 0.14.0");
+                println!("   cleen install latest");
                 return Err(CleenError::FrameIncompatible {
-                    frame_version: "0.1.0".to_string(),
+                    frame_version: "1.0.0+".to_string(),
                     required_compiler: "0.14.0".to_string(),
                     current_compiler: compiler_version.clone(),
                 });
