@@ -289,3 +289,297 @@ v0.3.0
 - All communications over HTTPS
 - Certificate validation enabled
 - No sensitive data transmission
+
+---
+
+## Plugin Management
+
+### Plugin Installation
+
+**Function**: Install plugins from the registry or local sources.
+
+**Behavior**:
+- Parses plugin name and optional version (e.g., `frame.web@1.0.0`)
+- Queries plugin registry for metadata and download URL
+- Downloads plugin archive containing `plugin.toml` and `plugin.wasm`
+- Extracts to `~/.cleen/plugins/<name>/<version>/`
+- Validates manifest and WASM binary integrity
+- Updates local plugin index
+
+**Commands**:
+- `cleen plugin install <name>` - Install latest version
+- `cleen plugin install <name>@<version>` - Install specific version
+
+**Examples**:
+```bash
+cleen plugin install frame.web
+# Output:
+# Downloading frame.web@1.0.0...
+# Extracting to ~/.cleen/plugins/frame.web/1.0.0/
+# Verifying plugin.toml...
+# Verifying plugin.wasm...
+# Plugin frame.web@1.0.0 installed successfully
+
+cleen plugin install frame.data@0.5.0
+# Output:
+# Downloading frame.data@0.5.0...
+# Plugin frame.data@0.5.0 installed successfully
+```
+
+### Plugin Listing
+
+**Function**: Display installed plugins and their versions.
+
+**Behavior**:
+- Scans `~/.cleen/plugins/` directory
+- Reads plugin.toml manifests
+- Shows active version indicator for multi-version plugins
+- Displays compatibility information
+
+**Command**:
+- `cleen plugin list` - Show all installed plugins
+
+**Examples**:
+```bash
+cleen plugin list
+# Output:
+# Installed plugins:
+#   frame.web
+#     * 1.0.0 (active)
+#       0.9.0
+#   frame.data
+#     * 0.5.0 (active)
+
+cleen plugin list
+# Output (when no plugins installed):
+# No plugins installed
+#
+# To install a plugin:
+#   cleen plugin install <name>
+```
+
+### Plugin Creation
+
+**Function**: Scaffold a new plugin project with template files.
+
+**Behavior**:
+- Creates plugin directory structure
+- Generates plugin.toml with metadata placeholders
+- Creates src/main.cln with plugin entry point template
+- Creates tests directory with example test
+- Generates README.md with usage instructions
+
+**Command**:
+- `cleen plugin create <name>` - Create new plugin project
+
+**Examples**:
+```bash
+cleen plugin create my-framework
+# Output:
+# Creating plugin project 'my-framework'...
+# Created my-framework/
+# Created my-framework/plugin.toml
+# Created my-framework/src/main.cln
+# Created my-framework/tests/test_expand.cln
+# Created my-framework/README.md
+#
+# Next steps:
+#   cd my-framework
+#   # Edit src/main.cln to implement your plugin
+#   cleen plugin build
+```
+
+### Plugin Building
+
+**Function**: Compile plugin source to WebAssembly.
+
+**Behavior**:
+- Locates plugin.toml in current directory
+- Parses manifest for entry point configuration
+- Invokes Clean Language compiler: `cln compile src/main.cln -o plugin.wasm`
+- Validates generated WASM output
+- Reports build status and any errors
+
+**Command**:
+- `cleen plugin build` - Build plugin in current directory
+
+**Examples**:
+```bash
+cleen plugin build
+# Output:
+# Building plugin 'my-framework'...
+# Compiling src/main.cln...
+# Generated plugin.wasm (24.5 KB)
+# Build successful
+
+cleen plugin build
+# Output (on error):
+# Building plugin 'my-framework'...
+# Compiling src/main.cln...
+# Error: Compilation failed
+#   src/main.cln:15:10 - Type mismatch: expected string, got integer
+```
+
+### Plugin Publishing
+
+**Function**: Publish plugin to the central registry.
+
+**Behavior**:
+- Validates plugin.toml completeness
+- Ensures plugin.wasm exists and is valid
+- Authenticates with registry (uses stored credentials)
+- Uploads plugin archive
+- Registers version in registry
+
+**Command**:
+- `cleen plugin publish` - Publish to registry
+
+**Examples**:
+```bash
+cleen plugin publish
+# Output:
+# Publishing my-framework@1.0.0...
+# Validating manifest...
+# Validating plugin.wasm...
+# Uploading to registry...
+# Published successfully
+#
+# Your plugin is now available:
+#   cleen plugin install my-framework
+```
+
+### Plugin Removal
+
+**Function**: Remove installed plugins.
+
+**Behavior**:
+- Removes plugin directory from `~/.cleen/plugins/<name>/`
+- Updates local plugin index
+- Warns if plugin is referenced in project files
+
+**Command**:
+- `cleen plugin remove <name>` - Remove plugin
+
+**Examples**:
+```bash
+cleen plugin remove frame.web
+# Output:
+# Removing frame.web...
+# Removed ~/.cleen/plugins/frame.web/
+# Plugin frame.web removed successfully
+
+cleen plugin remove frame.web
+# Output (when not installed):
+# Error: Plugin 'frame.web' is not installed
+```
+
+---
+
+## Plugin File System Layout
+
+### Plugin Installation Directory
+```
+~/.cleen/
+├── plugins/
+│   ├── frame.web/
+│   │   ├── 1.0.0/
+│   │   │   ├── plugin.toml      # Plugin manifest
+│   │   │   └── plugin.wasm      # Compiled plugin binary
+│   │   └── 0.9.0/
+│   │       ├── plugin.toml
+│   │       └── plugin.wasm
+│   └── frame.data/
+│       └── 0.5.0/
+│           ├── plugin.toml
+│           └── plugin.wasm
+└── config.json                   # Includes active_plugins section
+```
+
+### Plugin Project Structure
+```
+my-plugin/
+├── plugin.toml                   # Plugin manifest
+├── src/
+│   └── main.cln                 # Plugin entry point
+├── tests/
+│   └── test_expand.cln          # Plugin tests
+└── README.md                    # Plugin documentation
+```
+
+---
+
+## Plugin Configuration
+
+### Plugin Manifest (plugin.toml)
+```toml
+[plugin]
+name = "frame.web"
+version = "1.0.0"
+description = "Web framework plugin for Clean Language"
+author = "Clean Language Team"
+license = "MIT"
+repository = "https://github.com/example/frame.web"
+
+[compatibility]
+min_compiler_version = "0.15.0"
+max_compiler_version = "1.0.0"
+
+[exports]
+expand = "expand_block"
+validate = "validate_block"
+
+[dependencies]
+# Other plugins this plugin depends on (planned feature)
+```
+
+### Global Configuration Updates
+The `~/.cleen/config.json` file includes plugin configuration:
+```json
+{
+  "active_version": "0.15.0",
+  "installed_versions": { ... },
+  "active_plugins": {
+    "frame.web": "1.0.0",
+    "frame.data": "0.5.0"
+  },
+  "settings": { ... }
+}
+```
+
+---
+
+## Plugin Error Handling
+
+### Error Categories
+1. **Registry Errors**: Network failures, version not found, authentication issues
+2. **Manifest Errors**: Invalid plugin.toml, missing required fields
+3. **Build Errors**: Compilation failures, missing source files
+4. **Compatibility Errors**: Compiler version mismatch
+
+### Error Messages
+
+**Plugin Not Found**:
+```
+Error: Plugin 'unknown-plugin' not found in registry
+  Try 'cleen plugin list --available' to see available plugins
+```
+
+**Version Not Found**:
+```
+Error: Version '2.0.0' of plugin 'frame.web' not found
+  Available versions: 1.0.0, 0.9.0, 0.8.0
+```
+
+**Compatibility Error**:
+```
+Error: Plugin 'frame.web@1.0.0' requires compiler >= 0.15.0
+  Current compiler version: 0.14.0
+  Install a compatible compiler: cleen install 0.15.0
+```
+
+**Build Error**:
+```
+Error: Cannot find plugin.toml in current directory
+  Run this command from a plugin project directory
+  Or create a new plugin: cleen plugin create <name>
+```

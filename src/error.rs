@@ -85,6 +85,39 @@ pub enum CleenError {
         compiler_version: String,
         frame_version: String,
     },
+
+    // Plugin errors
+    #[error("Plugin '{name}' not found")]
+    PluginNotFound { name: String },
+
+    #[error("Plugin '{name}' version '{version}' not found")]
+    PluginVersionNotFound { name: String, version: String },
+
+    #[error("Plugin '{name}' is already installed")]
+    PluginAlreadyInstalled { name: String },
+
+    #[error("Plugin manifest not found: {path}")]
+    PluginManifestNotFound { path: PathBuf },
+
+    #[error("Invalid plugin manifest: {message}")]
+    PluginManifestError { message: String },
+
+    #[error("Plugin build failed: {message}")]
+    PluginBuildError { message: String },
+
+    #[error("Plugin '{name}' requires compiler >= {required}, but current is {current}")]
+    #[allow(dead_code)]
+    PluginIncompatible {
+        name: String,
+        required: String,
+        current: String,
+    },
+
+    #[error("Plugin registry error: {message}")]
+    PluginRegistryError { message: String },
+
+    #[error("No compiler installed. Plugins require a Clean Language compiler")]
+    NoCompilerForPlugin,
 }
 
 impl From<anyhow::Error> for CleenError {

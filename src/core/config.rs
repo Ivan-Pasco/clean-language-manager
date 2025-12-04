@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::PathBuf;
 
+use std::collections::HashMap;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub active_version: Option<String>,
@@ -18,6 +20,9 @@ pub struct Config {
     pub auto_offer_frame: bool,
     pub last_update_check: Option<String>,
     pub last_self_update_check: Option<String>,
+    /// Active plugin versions: plugin_name -> version
+    #[serde(default)]
+    pub active_plugins: HashMap<String, String>,
 }
 
 fn default_true() -> bool {
@@ -38,6 +43,7 @@ impl Default for Config {
             auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
+            active_plugins: HashMap::new(),
         }
     }
 }
@@ -56,6 +62,7 @@ impl Config {
             auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
+            active_plugins: HashMap::new(),
         })
     }
 
@@ -279,6 +286,50 @@ impl Config {
     pub fn get_frame_shim_path(&self) -> PathBuf {
         let binary_name = if cfg!(windows) { "frame.exe" } else { "frame" };
         self.get_bin_dir().join(binary_name)
+    }
+
+    // Plugin management methods
+
+    /// Get the plugins directory (~/.cleen/plugins/)
+    pub fn get_plugins_dir(&self) -> PathBuf {
+        self.cleen_dir.join("plugins")
+    }
+
+    /// Get the directory for a specific plugin (~/.cleen/plugins/<name>/)
+    pub fn get_plugin_dir(&self, name: &str) -> PathBuf {
+        self.get_plugins_dir().join(name)
+    }
+
+    /// Get the directory for a specific plugin version (~/.cleen/plugins/<name>/<version>/)
+    pub fn get_plugin_version_dir(&self, name: &str, version: &str) -> PathBuf {
+        self.get_plugin_dir(name).join(version)
+    }
+
+    /// Get the manifest path for a plugin version
+    pub fn get_plugin_manifest_path(&self, name: &str, version: &str) -> PathBuf {
+        self.get_plugin_version_dir(name, version).join("plugin.toml")
+    }
+
+    /// Get the WASM binary path for a plugin version
+    pub fn get_plugin_wasm_path(&self, name: &str, version: &str) -> PathBuf {
+        self.get_plugin_version_dir(name, version).join("plugin.wasm")
+    }
+
+    /// Set the active version for a plugin
+    pub fn set_active_plugin(&mut self, name: &str, version: &str) -> Result<()> {
+        self.active_plugins.insert(name.to_string(), version.to_string());
+        self.save()
+    }
+
+    /// Remove a plugin from the active plugins
+    pub fn remove_active_plugin(&mut self, name: &str) -> Result<()> {
+        self.active_plugins.remove(name);
+        self.save()
+    }
+
+    /// Get the active version for a plugin
+    pub fn get_active_plugin_version(&self, name: &str) -> Option<&String> {
+        self.active_plugins.get(name)
     }
 }
 

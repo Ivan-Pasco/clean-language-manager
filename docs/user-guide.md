@@ -497,3 +497,177 @@ CLEEN_VERBOSE=1 cleen <command>  # Verbose output
    ```bash
    cat ~/.cleen/config.json
    ```
+
+## Plugin Management
+
+Plugins extend Clean Language with framework-specific functionality. Plugins are written in Clean Language and compiled to WebAssembly.
+
+### Installing Plugins
+
+**Install a plugin from the registry**:
+```bash
+cleen plugin install frame.web
+```
+
+**Install a specific version**:
+```bash
+cleen plugin install frame.web@1.0.0
+```
+
+**See what's installed**:
+```bash
+cleen plugin list
+```
+
+### Creating a Plugin
+
+**Create a new plugin project**:
+```bash
+cleen plugin create my-plugin
+cd my-plugin
+```
+
+This creates:
+```
+my-plugin/
+├── plugin.toml       # Plugin manifest
+├── src/
+│   └── main.cln     # Plugin source
+├── tests/
+│   └── test_expand.cln
+└── README.md
+```
+
+**Build your plugin**:
+```bash
+cleen plugin build
+```
+
+This compiles `src/main.cln` to `plugin.wasm`.
+
+**Publish to the registry**:
+```bash
+cleen plugin publish
+```
+
+### Removing Plugins
+
+**Remove an installed plugin**:
+```bash
+cleen plugin remove frame.web
+```
+
+### Plugin Project Structure
+
+#### plugin.toml
+
+The manifest file defines your plugin:
+
+```toml
+[plugin]
+name = "my-plugin"
+version = "1.0.0"
+description = "My custom Clean Language plugin"
+author = "Your Name"
+license = "MIT"
+
+[compatibility]
+min_compiler_version = "0.15.0"
+
+[exports]
+expand = "expand_block"
+validate = "validate_block"
+```
+
+#### src/main.cln
+
+The entry point for your plugin:
+
+```clean
+// Plugin: my-plugin
+// Expand framework blocks into Clean Language code
+
+expand_block(block_name: string, attributes: string, body: string) -> string
+    // Implement block expansion logic here
+    return body
+
+validate_block(block_name: string, attributes: string, body: string) -> boolean
+    // Implement validation logic here
+    return true
+```
+
+### Plugin Development Workflow
+
+1. **Create the plugin project**:
+   ```bash
+   cleen plugin create my-framework
+   cd my-framework
+   ```
+
+2. **Edit the source code**:
+   ```bash
+   # Edit src/main.cln with your plugin logic
+   ```
+
+3. **Build and test**:
+   ```bash
+   cleen plugin build
+   # Run tests
+   cln test tests/test_expand.cln
+   ```
+
+4. **Publish when ready**:
+   ```bash
+   cleen plugin publish
+   ```
+
+### Troubleshooting Plugins
+
+**Plugin build fails**:
+```bash
+# Check compiler is installed
+cln --version
+
+# Ensure you're in the plugin directory
+ls plugin.toml
+
+# Check for syntax errors in source
+cln check src/main.cln
+```
+
+**Plugin not loading**:
+```bash
+# Verify plugin is installed
+cleen plugin list
+
+# Check plugin location
+ls ~/.cleen/plugins/
+
+# Verify plugin.wasm exists
+ls ~/.cleen/plugins/<name>/<version>/plugin.wasm
+```
+
+**Compatibility errors**:
+```bash
+# Check your compiler version
+cln --version
+
+# Check plugin requirements
+cat ~/.cleen/plugins/<name>/<version>/plugin.toml
+```
+
+### Plugin Directory Layout
+
+```
+~/.cleen/
+├── plugins/
+│   ├── frame.web/
+│   │   └── 1.0.0/
+│   │       ├── plugin.toml
+│   │       └── plugin.wasm
+│   └── frame.data/
+│       └── 0.5.0/
+│           ├── plugin.toml
+│           └── plugin.wasm
+└── config.json        # Tracks active plugins
+```

@@ -1,9 +1,11 @@
 pub mod available;
+pub mod cleanup;
 pub mod doctor;
 pub mod init;
 pub mod install;
 pub mod list;
 pub mod local;
+pub mod plugin;
 pub mod sync;
 pub mod uninstall;
 pub mod update;

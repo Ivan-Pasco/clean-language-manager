@@ -1,126 +1,168 @@
-# Clean Language Manager - Implementation Tasks
+# Clean Language Manager - Task Tracker
 
-## 🔴 CRITICAL - Core Infrastructure
+## ✅ Completed Features
 
-### Phase 1: Project Setup
-- [x] **Initialize Rust project structure** - Set up Cargo.toml with dependencies ✅ COMPLETED
-- [x] **Set up CLI interface with clap** - Define command structure and argument parsing ✅ COMPLETED
-- [x] **Implement basic command structure** - Create command modules and routing ✅ COMPLETED
-- [x] **Add error handling framework** - Set up thiserror with custom error types ✅ COMPLETED
-- [x] **Create configuration system** - JSON config with auto-creation and directory management ✅ COMPLETED
+### Core Infrastructure
+- [x] Initialize Rust project structure with Cargo.toml
+- [x] Set up CLI interface with clap (derive)
+- [x] Implement command routing and module structure
+- [x] Add error handling framework with thiserror
+- [x] Create JSON-based configuration system
+- [x] Implement version storage structure (~/.cleen/versions/)
+- [x] Create symlink/shim management system
+- [x] Add PATH management and shell integration
+- [x] GitHub API integration for releases
+- [x] Download and extract compiler binaries
 
-### Phase 2: Core Version Management
-- [x] **Implement version storage structure** - Complete directory management system ✅ COMPLETED
-- [x] **Create version switching system** - Full symlink/shim management ✅ COMPLETED  
-- [x] **Add PATH management** - Shell configuration detection and setup ✅ COMPLETED
-- [ ] **Add GitHub API integration** - Fetch releases and available versions
-- [ ] **Implement download functionality** - Download and extract compiler binaries
+### Compiler Version Management
+- [x] `cleen install <version>` - Download and install specific version
+- [x] `cleen install latest` - Install most recent release
+- [x] `cleen list` - Show installed versions with active indicator
+- [x] `cleen available` - List available versions from GitHub
+- [x] `cleen use <version>` - Switch to specific version globally
+- [x] `cleen local <version>` - Set project-specific version
+- [x] `cleen sync` - Install version from .cleanlanguage/.cleanversion
+- [x] `cleen uninstall <version>` - Remove installed version
 
-## 🟡 MEDIUM-HIGH - Essential Commands
+### Environment Setup
+- [x] `cleen init` - Initialize shell configuration
+- [x] `cleen doctor` - Check and repair environment setup
 
-### Basic Commands
-- [ ] **`cleen install <version>`** - Download and install specific version
-- [x] **`cleen list`** - Show installed versions with active indicator ✅ COMPLETED
-- [ ] **`cleen available`** - List available versions from GitHub
-- [x] **`cleen use <version>`** - Switch to specific version ✅ COMPLETED
-- [ ] **`cleen uninstall <version>`** - Remove installed version
+### Maintenance
+- [x] `cleen cleanup` - Remove old compiler versions (dry-run by default)
+- [x] `cleen cleanup --confirm` - Actually remove old versions
+- [x] `cleen cleanup --keep N` - Keep N most recent versions (default: 3)
+- [x] `cleen cleanup --plugins` - Clean up old plugin versions
 
-### Setup Commands
-- [x] **`cleen init`** - Initialize shell configuration ✅ COMPLETED
-- [x] **`cleen doctor`** - Check and repair environment setup ✅ COMPLETED
-- [ ] **Self-update functionality** - Update cleen itself
+### Update System
+- [x] `cleen update` - Check for compiler updates
+- [x] `cleen self-update` - Update cleen itself
 
-## 🟢 LOW - Advanced Features
+### Frame CLI Management
+- [x] `cleen frame install [version]` - Install Frame CLI
+- [x] `cleen frame list` - List installed Frame versions
+- [x] `cleen frame use <version>` - Switch Frame version
+- [x] `cleen frame uninstall <version>` - Remove Frame version
+- [x] Compiler/Frame version compatibility checking
 
-### Enhanced Functionality
-- [ ] **Per-project version overrides** - Support .cleen files
-- [ ] **Automatic cleanup** - Remove old/unused versions
-- [ ] **Version aliasing** - Support latest, stable aliases
-- [ ] **Offline mode** - Work with cached version info
-- [ ] **Progress indicators** - Show download/install progress
+### Plugin Management
+- [x] `cleen plugin install <name>[@version]` - Install plugin from registry
+- [x] `cleen plugin list` - List installed plugins
+- [x] `cleen plugin create <name>` - Scaffold new plugin project
+- [x] `cleen plugin build` - Build plugin to WASM
+- [x] `cleen plugin publish` - Publish to registry (placeholder)
+- [x] `cleen plugin remove <name>` - Remove installed plugin
+- [x] `cleen plugin use <name> <version>` - Switch plugin version
+- [x] Plugin manifest parsing (plugin.toml)
+- [x] Plugin project scaffolding with templates
 
-### Quality of Life
+### Cross-Platform Support
+- [x] Linux x86_64 binary downloads
+- [x] macOS x86_64 and ARM64 binary downloads
+- [x] Windows x86_64 binary downloads
+- [x] Platform-specific shell configuration
+
+## 🔄 In Progress
+
+*No tasks currently in progress*
+
+## 📋 Planned Features
+
+### Nice-to-Have Enhancements
 - [ ] **Shell completions** - Bash/zsh/fish completion scripts
-- [ ] **Detailed logging** - Debug and verbose output modes
-- [ ] **Configuration validation** - Verify setup integrity
-- [ ] **Backup/restore** - Save and restore version configurations
+- [x] **Automatic cleanup** - Remove old/unused versions with `cleen cleanup`
+- [ ] **Verbose logging mode** - Debug output with `--verbose` flag
+- [ ] **Offline mode** - Work with cached version info when offline
+- [ ] **Progress indicators** - Better download progress display
+- [ ] **Version aliasing** - Support `stable` alias in addition to `latest`
 
-## 📋 Implementation Details
+### Plugin System Enhancements
+- [ ] **Plugin registry API** - Full registry implementation at plugins.cleanlang.org
+- [ ] **Plugin dependencies** - Support for plugin-to-plugin dependencies
+- [ ] **Plugin search** - `cleen plugin search <query>`
+- [ ] **Plugin info** - `cleen plugin info <name>` for detailed metadata
 
-### File Structure
+## 📁 Project Structure
+
 ```
 src/
-├── main.rs                 # CLI entry point
+├── main.rs                 # CLI entry point with clap
+├── error.rs                # Custom error types
 ├── commands/
 │   ├── mod.rs
+│   ├── available.rs        # Available command
+│   ├── cleanup.rs          # Cleanup command
+│   ├── doctor.rs           # Doctor command
+│   ├── init.rs             # Init command
 │   ├── install.rs          # Install command
 │   ├── list.rs             # List command
-│   ├── use_version.rs      # Use command
+│   ├── local.rs            # Local version command
+│   ├── plugin.rs           # Plugin subcommands
+│   ├── sync.rs             # Sync command
 │   ├── uninstall.rs        # Uninstall command
-│   ├── available.rs        # Available command
-│   ├── init.rs             # Init command
-│   └── doctor.rs           # Doctor command
+│   ├── update.rs           # Update commands
+│   └── use_version.rs      # Use command
 ├── core/
 │   ├── mod.rs
 │   ├── config.rs           # Configuration management
 │   ├── version.rs          # Version handling
 │   ├── github.rs           # GitHub API integration
 │   ├── download.rs         # Download functionality
-│   └── shim.rs             # Symlink management
+│   ├── shim.rs             # Symlink management
+│   ├── frame.rs            # Frame CLI management
+│   └── compatibility.rs    # Version compatibility
+├── plugin/
+│   ├── mod.rs              # Plugin core functions
+│   ├── manifest.rs         # plugin.toml parsing
+│   ├── scaffold.rs         # Project scaffolding
+│   └── registry.rs         # Registry client
 └── utils/
     ├── mod.rs
     ├── fs.rs               # File system utilities
     └── shell.rs            # Shell integration
 ```
 
-### Dependencies
-```toml
-[dependencies]
-clap = { version = "4.4", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-dirs = "5.0"
-tar = "0.4"
-flate2 = "1.0"
-zip = "0.6"
+## 🔧 Configuration
+
+### Global Config (~/.cleen/config.json)
+```json
+{
+  "active_version": "0.14.0",
+  "frame_version": "1.0.0",
+  "cleen_dir": "/Users/user/.cleen",
+  "auto_cleanup": false,
+  "check_updates": true,
+  "auto_offer_frame": true,
+  "active_plugins": {
+    "frame.web": "1.0.0"
+  }
+}
 ```
 
-## 🎯 Current Priority
-
-**NEXT TASK:** Add GitHub API integration to fetch available versions for installation.
-
-## ✅ Completed Tasks - Phase 1 & 2
-
-### Core Infrastructure ✅
-- ✅ **Project Initialization** - Complete Rust project with all dependencies
-- ✅ **CLI Framework** - Full command-line interface with clap v3.2
-- ✅ **Error Handling** - Custom error types with thiserror for user-friendly messages
-- ✅ **Configuration System** - JSON-based config with automatic directory creation
-- ✅ **Module Architecture** - Clean separation: commands/, core/, utils/, error/
-
-### Version Management ✅  
-- ✅ **Storage System** - Complete ~/.cleen directory structure management
-- ✅ **Version Detection** - List installed versions with validation
-- ✅ **Shim Management** - Cross-platform symlink/binary routing system
-- ✅ **Shell Integration** - PATH detection and configuration guidance
-
-### Working Commands ✅
-- ✅ **`cleen list`** - Shows installed versions with active status
-- ✅ **`cleen use <version>`** - Switches between installed versions
-- ✅ **`cleen doctor`** - Comprehensive environment diagnostics
-- ✅ **`cleen init`** - Shell configuration setup with clear instructions
-
-### Testing & Validation ✅
-- ✅ **Compilation** - Project builds successfully with minimal warnings
-- ✅ **CLI Testing** - All implemented commands work correctly
-- ✅ **Error Handling** - Proper error messages and graceful failure handling
+### Directory Structure
+```
+~/.cleen/
+├── bin/                    # Shim directory (in PATH)
+│   ├── cln                 # Compiler shim
+│   └── frame               # Frame CLI shim
+├── versions/               # Installed compiler versions
+│   ├── 0.14.0/
+│   │   └── cln
+│   └── frame/
+│       └── 1.0.0/
+│           └── frame
+├── plugins/                # Installed plugins
+│   └── frame.web/
+│       └── 1.0.0/
+│           ├── plugin.toml
+│           └── plugin.wasm
+└── config.json             # Manager configuration
+```
 
 ## 📝 Notes
 
-- Target platforms: Linux (x86_64), macOS (x86_64/ARM64), Windows (x86_64)
 - GitHub repo: `https://github.com/Ivan-Pasco/clean-language-compiler`
-- Binary name: `cln`
-- Manager name: `cleen`
+- Frame CLI repo: `https://github.com/Ivan-Pasco/frame`
+- Compiler binary: `cln`
+- Manager binary: `cleen`
+- Plugin registry: `https://plugins.cleanlang.org` (planned)

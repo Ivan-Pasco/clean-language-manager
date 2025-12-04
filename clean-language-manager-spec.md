@@ -115,4 +115,166 @@ cln --version
 
 ```bash
 curl -sSL https://github.com/Ivan-Pasco/clean-language-compiler/releases/latest/download/install.sh | bash
-``` 
+```
+
+---
+
+## 📦 Plugin Management Features
+
+Plugins extend Clean Language by providing framework-specific functionality. Plugins are written in Clean Language itself, compiled to WebAssembly, and loaded by the compiler during compilation.
+
+### Plugin Commands
+
+| Command | Description |
+|---------|-------------|
+| `cleen plugin install <name>` | Install plugin from registry |
+| `cleen plugin install <name>@<ver>` | Install specific version |
+| `cleen plugin create <name>` | Scaffold new plugin project |
+| `cleen plugin build` | Build current plugin to WASM |
+| `cleen plugin publish` | Publish to registry |
+| `cleen plugin list` | List installed plugins |
+| `cleen plugin remove <name>` | Remove installed plugin |
+
+---
+
+### Plugin Directory Structure
+
+Plugins are installed to `~/.cleen/plugins/`:
+
+```
+~/.cleen/
+├── versions/           # (existing) Compiler versions
+│   └── 0.15.0/
+│       └── cln
+├── plugins/            # (new) Installed plugins
+│   ├── frame.web/
+│   │   └── 1.0.0/
+│   │       ├── plugin.toml
+│   │       └── plugin.wasm
+│   └── frame.data/
+│       └── 1.0.0/
+│           ├── plugin.toml
+│           └── plugin.wasm
+├── bin/                # (existing) Shim directory
+│   └── cln
+└── config.toml         # (existing) Configuration
+```
+
+---
+
+### Plugin Manifest Format (plugin.toml)
+
+Each plugin includes a `plugin.toml` manifest that describes the plugin metadata and capabilities:
+
+```toml
+[plugin]
+name = "frame.web"
+version = "1.0.0"
+description = "Web framework plugin for Clean Language"
+author = "Clean Language Team"
+license = "MIT"
+
+[compatibility]
+min_compiler_version = "0.15.0"
+
+[exports]
+expand = "expand_block"
+validate = "validate_block"
+```
+
+**Fields:**
+- `name`: Unique plugin identifier (e.g., `frame.web`, `frame.data`)
+- `version`: Semantic version of the plugin
+- `description`: Human-readable description
+- `author`: Plugin author or organization
+- `license`: SPDX license identifier
+- `min_compiler_version`: Minimum required compiler version
+- `expand`: Entry point function for block expansion
+- `validate`: Entry point function for block validation
+
+---
+
+### Plugin Scaffold Template
+
+Running `cleen plugin create <name>` generates a new plugin project:
+
+```
+<name>/
+├── plugin.toml
+├── src/
+│   └── main.cln      # Plugin source in Clean Language
+├── tests/
+│   └── test_expand.cln
+└── README.md
+```
+
+**Generated `src/main.cln` template:**
+
+```clean
+// Plugin: <name>
+// Expand framework blocks into Clean Language code
+
+expand_block(block_name: string, attributes: string, body: string) -> string
+    // TODO: Implement block expansion
+    return body
+
+validate_block(block_name: string, attributes: string, body: string) -> boolean
+    // TODO: Implement block validation
+    return true
+```
+
+---
+
+### Plugin Workflow
+
+**Installing a Plugin:**
+```bash
+cleen plugin install frame.web
+# → Downloads and installs frame.web plugin
+
+cleen plugin install frame.web@1.0.0
+# → Installs specific version 1.0.0
+```
+
+**Creating a New Plugin:**
+```bash
+cleen plugin create my-plugin
+# → Creates my-plugin/ directory with scaffold
+
+cd my-plugin
+cleen plugin build
+# → Compiles src/main.cln to plugin.wasm
+
+cleen plugin publish
+# → Publishes to the plugin registry
+```
+
+**Managing Installed Plugins:**
+```bash
+cleen plugin list
+# → Shows all installed plugins
+
+cleen plugin remove frame.web
+# → Removes the frame.web plugin
+```
+
+---
+
+### Plugin Registry
+
+Plugins are distributed via a central registry at `https://plugins.cleanlang.org` (planned). The registry provides:
+
+- **Discovery**: Search and browse available plugins
+- **Version Management**: Semantic versioning with compatibility checks
+- **Integrity**: Checksum verification for downloaded plugins
+- **Metadata**: Description, documentation, and dependency information
+
+---
+
+### How Plugins Work
+
+1. **Source Code**: Plugins are written in Clean Language using the plugin API
+2. **Compilation**: `cleen plugin build` compiles `.cln` files to `plugin.wasm`
+3. **Installation**: Plugins are installed to `~/.cleen/plugins/<name>/<version>/`
+4. **Loading**: The compiler loads plugins based on `import:` blocks in source files
+5. **Execution**: Plugin WASM is executed at compile time to transform code 
