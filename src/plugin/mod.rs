@@ -168,10 +168,7 @@ pub fn parse_plugin_specifier(specifier: &str) -> (String, Option<String>) {
 
 /// Check if the current compiler version is compatible with a plugin
 #[allow(dead_code)]
-pub fn check_plugin_compatibility(
-    config: &Config,
-    manifest: &PluginManifest,
-) -> Result<()> {
+pub fn check_plugin_compatibility(config: &Config, manifest: &PluginManifest) -> Result<()> {
     let current_version = match &config.active_version {
         Some(v) => v.clone(),
         None => return Err(CleenError::NoCompilerForPlugin),
@@ -199,14 +196,8 @@ fn version_satisfies(current: &str, required: &str) -> bool {
     let required = required.trim_start_matches('v');
 
     // Parse version parts
-    let current_parts: Vec<u32> = current
-        .split('.')
-        .filter_map(|p| p.parse().ok())
-        .collect();
-    let required_parts: Vec<u32> = required
-        .split('.')
-        .filter_map(|p| p.parse().ok())
-        .collect();
+    let current_parts: Vec<u32> = current.split('.').filter_map(|p| p.parse().ok()).collect();
+    let required_parts: Vec<u32> = required.split('.').filter_map(|p| p.parse().ok()).collect();
 
     // Compare each part
     for i in 0..std::cmp::max(current_parts.len(), required_parts.len()) {

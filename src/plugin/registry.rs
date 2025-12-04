@@ -82,11 +82,7 @@ impl RegistryClient {
 }
 
 /// Install a plugin from the registry
-pub fn install_from_registry(
-    config: &mut Config,
-    name: &str,
-    version: Option<&str>,
-) -> Result<()> {
+pub fn install_from_registry(config: &mut Config, name: &str, version: Option<&str>) -> Result<()> {
     let client = RegistryClient::new();
 
     // Try to get plugin info from registry
@@ -101,7 +97,11 @@ pub fn install_from_registry(
             println!();
             println!("To install a plugin locally:");
             println!("  1. Build the plugin: cleen plugin build");
-            println!("  2. Copy files to ~/.cleen/plugins/{}/{}/", name, version.unwrap_or("1.0.0"));
+            println!(
+                "  2. Copy files to ~/.cleen/plugins/{}/{}/",
+                name,
+                version.unwrap_or("1.0.0")
+            );
             println!();
             Err(e)
         }
@@ -119,22 +119,21 @@ fn download_and_install_plugin(config: &mut Config, info: &PluginInfo) -> Result
     // Download plugin archive
     // This is a placeholder - actual implementation would download from info.download_url
 
-    println!(
-        "Extracting to {}...",
-        plugin_dir.display()
-    );
+    println!("Extracting to {}...", plugin_dir.display());
 
     // Verify files
     let manifest_path = plugin_dir.join("plugin.toml");
     let wasm_path = plugin_dir.join("plugin.wasm");
 
     if !manifest_path.exists() {
-        return Err(CleenError::PluginManifestNotFound { path: manifest_path });
+        return Err(CleenError::PluginManifestNotFound {
+            path: manifest_path,
+        });
     }
 
     if !wasm_path.exists() {
         return Err(CleenError::PluginManifestError {
-            message: format!("plugin.wasm not found in downloaded package"),
+            message: "plugin.wasm not found in downloaded package".to_string(),
         });
     }
 
@@ -156,10 +155,7 @@ fn download_and_install_plugin(config: &mut Config, info: &PluginInfo) -> Result
 }
 
 /// Install a plugin from a local directory
-pub fn install_from_local(
-    config: &mut Config,
-    source_dir: &Path,
-) -> Result<()> {
+pub fn install_from_local(config: &mut Config, source_dir: &Path) -> Result<()> {
     // Load manifest from source
     let manifest_path = source_dir.join("plugin.toml");
     let manifest = PluginManifest::load(&manifest_path)?;

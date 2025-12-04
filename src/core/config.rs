@@ -307,17 +307,20 @@ impl Config {
 
     /// Get the manifest path for a plugin version
     pub fn get_plugin_manifest_path(&self, name: &str, version: &str) -> PathBuf {
-        self.get_plugin_version_dir(name, version).join("plugin.toml")
+        self.get_plugin_version_dir(name, version)
+            .join("plugin.toml")
     }
 
     /// Get the WASM binary path for a plugin version
     pub fn get_plugin_wasm_path(&self, name: &str, version: &str) -> PathBuf {
-        self.get_plugin_version_dir(name, version).join("plugin.wasm")
+        self.get_plugin_version_dir(name, version)
+            .join("plugin.wasm")
     }
 
     /// Set the active version for a plugin
     pub fn set_active_plugin(&mut self, name: &str, version: &str) -> Result<()> {
-        self.active_plugins.insert(name.to_string(), version.to_string());
+        self.active_plugins
+            .insert(name.to_string(), version.to_string());
         self.save()
     }
 

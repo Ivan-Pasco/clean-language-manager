@@ -139,7 +139,12 @@ impl PluginManifest {
         }
 
         // Validate name format (alphanumeric, dots, hyphens)
-        if !self.plugin.name.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_') {
+        if !self
+            .plugin
+            .name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_')
+        {
             return Err(CleenError::PluginManifestError {
                 message: "Plugin name can only contain alphanumeric characters, dots, hyphens, and underscores".to_string(),
             });
@@ -174,7 +179,10 @@ validate = "validate_block"
         let manifest = PluginManifest::parse(content).unwrap();
         assert_eq!(manifest.plugin.name, "frame.web");
         assert_eq!(manifest.plugin.version, "1.0.0");
-        assert_eq!(manifest.compatibility.min_compiler_version, Some("0.15.0".to_string()));
+        assert_eq!(
+            manifest.compatibility.min_compiler_version,
+            Some("0.15.0".to_string())
+        );
     }
 
     #[test]

@@ -1,12 +1,12 @@
 use crate::core::config::Config;
 use crate::error::{CleenError, Result};
+use crate::plugin::manifest::PluginManifest;
+use crate::plugin::registry;
+use crate::plugin::scaffold;
 use crate::plugin::{
     get_plugin_versions, is_plugin_installed, list_installed_plugins, parse_plugin_specifier,
     remove_plugin,
 };
-use crate::plugin::manifest::PluginManifest;
-use crate::plugin::registry;
-use crate::plugin::scaffold;
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -127,7 +127,10 @@ pub fn build_plugin() -> Result<()> {
 
     // Check if compiler is available
     let config = Config::load()?;
-    let compiler_version = config.active_version.clone().ok_or(CleenError::NoCompilerForPlugin)?;
+    let compiler_version = config
+        .active_version
+        .clone()
+        .ok_or(CleenError::NoCompilerForPlugin)?;
 
     println!("Compiling src/main.cln...");
 
@@ -165,11 +168,7 @@ pub fn build_plugin() -> Result<()> {
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 let stdout = String::from_utf8_lossy(&result.stdout);
                 Err(CleenError::PluginBuildError {
-                    message: format!(
-                        "Compilation failed:\n{}\n{}",
-                        stdout.trim(),
-                        stderr.trim()
-                    ),
+                    message: format!("Compilation failed:\n{}\n{}", stdout.trim(), stderr.trim()),
                 })
             }
         }

@@ -190,19 +190,21 @@ fn main() -> Result<()> {
         Commands::SelfUpdate => {
             commands::update::update_self_auto().map_err(|e| anyhow::anyhow!(e))
         }
-        Commands::Cleanup { confirm, keep, plugins } => {
+        Commands::Cleanup {
+            confirm,
+            keep,
+            plugins,
+        } => {
             if plugins {
                 if confirm {
                     commands::cleanup::cleanup_plugins_execute().map_err(|e| anyhow::anyhow!(e))
                 } else {
                     commands::cleanup::cleanup_plugins_dry_run().map_err(|e| anyhow::anyhow!(e))
                 }
+            } else if confirm {
+                commands::cleanup::cleanup_execute(keep).map_err(|e| anyhow::anyhow!(e))
             } else {
-                if confirm {
-                    commands::cleanup::cleanup_execute(keep).map_err(|e| anyhow::anyhow!(e))
-                } else {
-                    commands::cleanup::cleanup_dry_run(keep).map_err(|e| anyhow::anyhow!(e))
-                }
+                commands::cleanup::cleanup_dry_run(keep).map_err(|e| anyhow::anyhow!(e))
             }
         }
         Commands::Frame { command } => match command {
@@ -265,7 +267,8 @@ fn main() -> Result<()> {
                 commands::plugin::remove_plugin_command(&name).map_err(|e| anyhow::anyhow!(e))
             }
             PluginCommands::Use { name, version } => {
-                commands::plugin::use_plugin_version(&name, &version).map_err(|e| anyhow::anyhow!(e))
+                commands::plugin::use_plugin_version(&name, &version)
+                    .map_err(|e| anyhow::anyhow!(e))
             }
         },
     };

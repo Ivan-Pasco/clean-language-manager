@@ -65,7 +65,7 @@ pub fn list_cleanup_candidates(config: &Config) -> Result<Vec<CleanupCandidate>>
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     let parse_version = |v: &str| -> Vec<u32> {
         v.trim_start_matches('v')
-            .split(|c: char| c == '.' || c == '-')
+            .split(['.', '-'])
             .filter_map(|p| p.parse::<u32>().ok())
             .collect()
     };
@@ -169,7 +169,11 @@ pub fn cleanup_dry_run(keep_count: usize) -> Result<()> {
         for c in &protected {
             let reasons: Vec<&str> = [
                 if c.is_active { Some("active") } else { None },
-                if c.is_frame_dependency { Some("frame dependency") } else { None },
+                if c.is_frame_dependency {
+                    Some("frame dependency")
+                } else {
+                    None
+                },
             ]
             .into_iter()
             .flatten()
@@ -199,10 +203,7 @@ pub fn cleanup_dry_run(keep_count: usize) -> Result<()> {
         println!("No versions to remove.");
     } else {
         let total_size: u64 = to_remove.iter().map(|c| c.size_bytes).sum();
-        println!(
-            "Versions to remove ({} total):",
-            format_size(total_size)
-        );
+        println!("Versions to remove ({} total):", format_size(total_size));
         for c in &to_remove {
             println!("  {} ({})", c.version, format_size(c.size_bytes));
         }
@@ -361,10 +362,7 @@ pub fn cleanup_plugins_dry_run() -> Result<()> {
     if !found_any {
         println!("No plugins with multiple versions found.");
     } else {
-        println!(
-            "Total removable: {}",
-            format_size(total_removable)
-        );
+        println!("Total removable: {}", format_size(total_removable));
         println!();
         println!("Run 'cleen cleanup --plugins --confirm' to remove inactive plugin versions.");
     }
