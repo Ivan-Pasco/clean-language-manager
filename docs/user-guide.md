@@ -498,6 +498,290 @@ CLEEN_VERBOSE=1 cleen <command>  # Verbose output
    cat ~/.cleen/config.json
    ```
 
+## Frame CLI Management
+
+Frame is the official full-stack web framework for Clean Language. The `cleen frame` commands help you manage Frame CLI installations and run Frame applications.
+
+### Installing Frame CLI
+
+**Install Frame CLI (auto-detects compatible version)**:
+```bash
+cleen frame install
+```
+
+**Install a specific version**:
+```bash
+cleen frame install 1.0.0
+```
+
+**See what's installed**:
+```bash
+cleen frame list
+```
+
+### Creating Frame Projects
+
+**Create a new Frame project**:
+```bash
+cleen frame new myapp
+```
+
+This creates a new Frame project using the default API template. Available templates:
+- `api` - API-only backend server (default)
+- `web` - Full-stack web application (frontend + backend)
+- `minimal` - Bare minimum single-file project
+
+**Create with a specific template**:
+```bash
+cleen frame new myapp --template web
+cleen frame new myapp --template api
+cleen frame new myapp --template minimal
+```
+
+**Customize the port**:
+```bash
+cleen frame new myapp --port 8080
+```
+
+The generated project structure for the `api` template:
+```
+myapp/
+├── app/
+│   └── api/
+│       └── main.cln          # API endpoints
+├── config/
+│   └── app.cln              # Configuration
+├── dist/                    # Build output
+├── frame.toml               # Project manifest
+└── .gitignore
+```
+
+### Building Frame Projects
+
+**Build for production**:
+```bash
+cd myapp
+cleen frame build
+```
+
+This will:
+1. Find the entry point (from `frame.toml` or default locations)
+2. Compile with plugin support
+3. Optimize the WASM output
+4. Output to `dist/` directory
+
+**Build with custom paths**:
+```bash
+cleen frame build --input ./app/api/main.cln --output ./build
+```
+
+**Set optimization level**:
+```bash
+cleen frame build --optimize 3    # Maximum optimization
+cleen frame build --optimize 0    # No optimization (faster builds)
+```
+
+Optimization levels:
+- `0` - No optimization (fastest compilation)
+- `1` - Basic optimization
+- `2` - Default optimization (balance speed/size)
+- `3` - Maximum optimization (smallest size)
+
+### Running Frame Applications
+
+**Start a development server**:
+```bash
+cleen frame serve main.cln
+```
+
+This will:
+1. Compile your `.cln` source file with plugins enabled
+2. Start the frame-runtime HTTP server
+3. Listen on http://127.0.0.1:3000 by default
+
+**Customize port and host**:
+```bash
+cleen frame serve main.cln --port 8080 --host 0.0.0.0
+```
+
+**Enable debug output**:
+```bash
+cleen frame serve main.cln --debug
+```
+
+**Stop a running server**:
+```bash
+cleen frame stop
+```
+
+### Frame Serve Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--port` | `-p` | Port to listen on | 3000 |
+| `--host` | | Host to bind to | 127.0.0.1 |
+| `--debug` | `-d` | Enable debug output | false |
+
+### Example: Running an API Server
+
+Create a file `api.cln` with endpoints:
+
+```clean
+import:
+	frame.web
+
+endpoints:
+	GET /api/hello:
+		return "Hello, World!"
+
+	GET /api/users/:id:
+		string id = req.params.id
+		return "User ID: " + id
+```
+
+Run it:
+```bash
+cleen frame serve api.cln
+```
+
+Test with curl:
+```bash
+curl http://localhost:3000/api/hello
+# Output: Hello, World!
+
+curl http://localhost:3000/api/users/123
+# Output: User ID: 123
+```
+
+### Troubleshooting Frame
+
+**Compilation errors**:
+```bash
+# The serve command will show compilation errors
+cleen frame serve main.cln
+
+# For detailed output, use debug mode
+cleen frame serve main.cln --debug
+```
+
+**Port already in use**:
+```bash
+# Check if a server is already running
+cleen frame stop
+
+# Or use a different port
+cleen frame serve main.cln --port 8080
+```
+
+**frame-runtime not found**:
+```bash
+# Ensure Frame CLI is installed
+cleen frame install
+
+# Check Frame installation
+cleen frame list
+```
+
+## Clean Server Management
+
+Clean Server is the runtime execution environment for compiled Clean Language WASM applications. It provides HTTP server capabilities, database connectivity, and other system integrations.
+
+### Installing Clean Server
+
+**Install Clean Server (gets latest version)**:
+```bash
+cleen server install
+```
+
+**Install a specific version**:
+```bash
+cleen server install 1.0.0
+```
+
+**Note**: When you run `cleen frame install`, Clean Server is automatically installed if not already present.
+
+### Managing Server Versions
+
+**See what's installed**:
+```bash
+cleen server list
+```
+
+**Switch to a specific version**:
+```bash
+cleen server use 1.0.0
+```
+
+**Remove an unused version**:
+```bash
+cleen server uninstall 1.0.0
+```
+
+**Check server status**:
+```bash
+cleen server status
+```
+
+### Running WASM Applications
+
+**Run a compiled WASM file**:
+```bash
+cleen server run app.wasm
+```
+
+**Customize port and host**:
+```bash
+cleen server run app.wasm --port 8080 --host 0.0.0.0
+```
+
+### Server Run Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--port` | `-p` | Port to listen on | 3000 |
+| `--host` | | Host to bind to | 127.0.0.1 |
+
+### Directory Layout
+
+```
+~/.cleen/
+├── server/
+│   ├── 1.0.0/
+│   │   └── clean-server       # Clean Server v1.0.0 binary
+│   └── 1.1.0/
+│       └── clean-server       # Clean Server v1.1.0 binary
+└── config.json               # Tracks active server version
+```
+
+### Troubleshooting Server
+
+**Server binary not found**:
+```bash
+# Check server is installed
+cleen server list
+
+# Install if missing
+cleen server install
+```
+
+**WASM file not found**:
+```bash
+# Ensure the WASM file exists
+ls app.wasm
+
+# Build your project first
+cleen frame build
+```
+
+**Port already in use**:
+```bash
+# Use a different port
+cleen server run app.wasm --port 8080
+
+# Or find and stop the process using the port
+lsof -i :3000
+```
+
 ## Plugin Management
 
 Plugins extend Clean Language with framework-specific functionality. Plugins are written in Clean Language and compiled to WebAssembly.

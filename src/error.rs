@@ -63,6 +63,7 @@ pub enum CleenError {
     FrameVersionNotFound { frame_version: String },
 
     #[error("Frame CLI version '{frame_version}' is already installed")]
+    #[allow(dead_code)]
     FrameVersionAlreadyInstalled { frame_version: String },
 
     #[error("Frame CLI {frame_version} requires compiler >= {required_compiler}, but current compiler is {current_compiler}")]
@@ -85,6 +86,26 @@ pub enum CleenError {
         compiler_version: String,
         frame_version: String,
     },
+
+    // Server errors
+    #[error("File not found: {path}")]
+    FileNotFound { path: String },
+
+    #[error("Compilation failed: {message}")]
+    CompilationFailed { message: String },
+
+    #[error("Server failed to start: {message}")]
+    ServerStartFailed { message: String },
+
+    #[error("IO error: {message}")]
+    IoError { message: String },
+
+    // Project errors
+    #[error("Project '{name}' already exists")]
+    ProjectAlreadyExists { name: String },
+
+    #[error("Invalid template: '{template}'. Valid templates: api, web, minimal")]
+    InvalidTemplate { template: String },
 
     // Plugin errors
     #[error("Plugin '{name}' not found")]
@@ -118,6 +139,19 @@ pub enum CleenError {
 
     #[error("No compiler installed. Plugins require a Clean Language compiler")]
     NoCompilerForPlugin,
+
+    // Clean Server errors
+    #[error("Clean Server version '{version}' not found")]
+    ServerVersionNotFound { version: String },
+
+    #[error("Clean Server version '{version}' is not installed")]
+    ServerVersionNotInstalled { version: String },
+
+    #[error("No Clean Server version is installed. Run 'cleen server install' first")]
+    NoServerInstalled,
+
+    #[error("Clean Server asset not found for version '{version}' on platform '{platform}'")]
+    ServerAssetNotFound { version: String, platform: String },
 }
 
 impl From<anyhow::Error> for CleenError {

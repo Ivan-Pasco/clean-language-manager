@@ -11,6 +11,8 @@ pub struct Config {
     pub active_version: Option<String>,
     #[serde(default)]
     pub frame_version: Option<String>,
+    #[serde(default)]
+    pub server_version: Option<String>,
     pub cleen_dir: PathBuf,
     pub auto_cleanup: bool,
     pub github_api_token: Option<String>,
@@ -36,6 +38,7 @@ impl Default for Config {
         Config {
             active_version: None,
             frame_version: None,
+            server_version: None,
             cleen_dir,
             auto_cleanup: false,
             github_api_token: None,
@@ -55,6 +58,7 @@ impl Config {
         Ok(Config {
             active_version: None,
             frame_version: None,
+            server_version: None,
             cleen_dir,
             auto_cleanup: false,
             github_api_token: std::env::var("GITHUB_TOKEN").ok(),

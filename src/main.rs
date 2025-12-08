@@ -97,23 +97,68 @@ enum Commands {
         #[clap(subcommand)]
         command: PluginCommands,
     },
+    /// Clean Server management (executes compiled WASM applications)
+    Server {
+        #[clap(subcommand)]
+        command: ServerCommands,
+    },
 }
 
 #[derive(Subcommand)]
 enum FrameCommands {
-    /// Install Frame CLI
+    /// Create a new Frame project
+    New {
+        /// Name of the project to create
+        name: String,
+        /// Project template: api, web, or minimal (default: api)
+        #[clap(short, long, default_value = "api")]
+        template: String,
+        /// Port for development server (default: 3000)
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+    },
+    /// Build a Frame project for production
+    Build {
+        /// Input file or project directory (default: current directory)
+        #[clap(default_value = ".")]
+        input: String,
+        /// Output directory (default: dist/)
+        #[clap(short, long, default_value = "dist")]
+        output: String,
+        /// Optimization level: 0, 1, 2, 3, s, z (default: 2)
+        #[clap(short = 'O', long, default_value = "2")]
+        optimize: String,
+    },
+    /// Start a development server for a Frame application
+    Serve {
+        /// Input file to serve (.cln source file with endpoints)
+        #[clap(default_value = "app/api/main.cln")]
+        input: String,
+        /// Port to listen on (default: 3000)
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        /// Host to bind to (default: 127.0.0.1)
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Enable debug output
+        #[clap(short, long)]
+        debug: bool,
+    },
+    /// Stop a running Frame development server
+    Stop,
+    /// Install Frame runtime
     Install {
         /// Version to install (optional, auto-detects compatible version)
         version: Option<String>,
     },
-    /// List installed Frame CLI versions
+    /// List installed Frame versions
     List,
-    /// Switch to a specific Frame CLI version
+    /// Switch to a specific Frame version
     Use {
         /// Version to use
         version: String,
     },
-    /// Uninstall a Frame CLI version
+    /// Uninstall a Frame version
     Uninstall {
         /// Version to uninstall
         version: String,
@@ -153,6 +198,40 @@ enum PluginCommands {
         /// Version to use
         version: String,
     },
+}
+
+#[derive(Subcommand)]
+enum ServerCommands {
+    /// Install Clean Server (WASM execution runtime)
+    Install {
+        /// Version to install (optional, uses latest if not specified)
+        version: Option<String>,
+    },
+    /// List installed Clean Server versions
+    List,
+    /// Switch to a specific Clean Server version
+    Use {
+        /// Version to use
+        version: String,
+    },
+    /// Uninstall a Clean Server version
+    Uninstall {
+        /// Version to uninstall
+        version: String,
+    },
+    /// Run a compiled WASM application
+    Run {
+        /// Path to the WASM file to execute
+        wasm_file: String,
+        /// Port to listen on (default: 3000)
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        /// Host to bind to (default: 127.0.0.1)
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+    },
+    /// Show Clean Server version and status
+    Status,
 }
 
 fn main() -> Result<()> {
@@ -208,6 +287,26 @@ fn main() -> Result<()> {
             }
         }
         Commands::Frame { command } => match command {
+            FrameCommands::New {
+                name,
+                template,
+                port,
+            } => core::frame::create_project(&name, &template, port)
+                .map_err(|e| anyhow::anyhow!(e)),
+            FrameCommands::Build {
+                input,
+                output,
+                optimize,
+            } => core::frame::build_project(&input, &output, &optimize)
+                .map_err(|e| anyhow::anyhow!(e)),
+            FrameCommands::Serve {
+                input,
+                port,
+                host,
+                debug,
+            } => core::frame::serve_application(&input, port, &host, debug)
+                .map_err(|e| anyhow::anyhow!(e)),
+            FrameCommands::Stop => core::frame::stop_server().map_err(|e| anyhow::anyhow!(e)),
             FrameCommands::Install { version } => {
                 core::frame::install_frame(version.as_deref(), false)
                     .map_err(|e| anyhow::anyhow!(e))
@@ -218,12 +317,12 @@ fn main() -> Result<()> {
                     core::frame::list_frame_versions(&config).map_err(|e| anyhow::anyhow!(e))?;
 
                 if versions.is_empty() {
-                    println!("No Frame CLI versions installed");
+                    println!("No Frame versions installed");
                     println!();
-                    println!("To install Frame CLI:");
+                    println!("To install Frame:");
                     println!("   cleen frame install");
                 } else {
-                    println!("Installed Frame CLI versions:");
+                    println!("Installed Frame versions:");
                     for v in &versions {
                         let marker = if config.frame_version.as_deref() == Some(v) {
                             "* "
@@ -269,6 +368,28 @@ fn main() -> Result<()> {
             PluginCommands::Use { name, version } => {
                 commands::plugin::use_plugin_version(&name, &version)
                     .map_err(|e| anyhow::anyhow!(e))
+            }
+        },
+        Commands::Server { command } => match command {
+            ServerCommands::Install { version } => {
+                core::server::install_server(version.as_deref()).map_err(|e| anyhow::anyhow!(e))
+            }
+            ServerCommands::List => {
+                core::server::list_versions().map_err(|e| anyhow::anyhow!(e))
+            }
+            ServerCommands::Use { version } => {
+                core::server::use_version(&version).map_err(|e| anyhow::anyhow!(e))
+            }
+            ServerCommands::Uninstall { version } => {
+                core::server::uninstall_version(&version).map_err(|e| anyhow::anyhow!(e))
+            }
+            ServerCommands::Run {
+                wasm_file,
+                port,
+                host,
+            } => core::server::run_wasm(&wasm_file, port, &host).map_err(|e| anyhow::anyhow!(e)),
+            ServerCommands::Status => {
+                core::server::show_status().map_err(|e| anyhow::anyhow!(e))
             }
         },
     };
