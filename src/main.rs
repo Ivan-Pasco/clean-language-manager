@@ -1,11 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-mod commands;
-mod core;
-mod error;
-mod plugin;
-mod utils;
+// Use the library modules
+use cleen::{commands, core, error, plugin};
 
 #[derive(Parser)]
 #[clap(name = "cleen")]
@@ -116,6 +113,18 @@ enum FrameCommands {
         /// Port for development server (default: 3000)
         #[clap(short, long, default_value = "3000")]
         port: u16,
+    },
+    /// Scan and discover project files (dry-run for build)
+    Scan {
+        /// Project directory to scan (default: current directory)
+        #[clap(default_value = ".")]
+        project: String,
+        /// Output format: text or json
+        #[clap(short, long, default_value = "text")]
+        format: String,
+        /// Show verbose output including file paths
+        #[clap(short, long)]
+        verbose: bool,
     },
     /// Build a Frame project for production
     Build {
@@ -292,6 +301,12 @@ fn main() -> Result<()> {
                 template,
                 port,
             } => core::frame::create_project(&name, &template, port)
+                .map_err(|e| anyhow::anyhow!(e)),
+            FrameCommands::Scan {
+                project,
+                format,
+                verbose,
+            } => core::frame::scan_project(&project, &format, verbose)
                 .map_err(|e| anyhow::anyhow!(e)),
             FrameCommands::Build {
                 input,

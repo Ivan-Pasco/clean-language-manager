@@ -827,25 +827,27 @@ server:
     );
     std::fs::write(project_dir.join("config/app.cln"), config_cln)?;
 
-    // Create frame.toml
-    let frame_toml = format!(
-        r#"[project]
-name = "{name}"
-version = "0.1.0"
-description = "A Frame API server"
+    // Create config.cln
+    let config_cln_root = format!(
+        r#"// {name} Configuration
 
-[server]
-port = {port}
-host = "127.0.0.1"
-entry = "app/api/main.cln"
+config:
+	project:
+		name = "{name}"
+		version = "0.1.0"
+		description = "A Frame API server"
 
-[plugins]
-frame.web = "1.0.0"
+	build:
+		output = "dist"
+
+	server:
+		port = {port}
+		host = "127.0.0.1"
 "#,
         name = name,
         port = port
     );
-    std::fs::write(project_dir.join("frame.toml"), frame_toml)?;
+    std::fs::write(project_dir.join("config.cln"), config_cln_root)?;
 
     // Create .gitignore
     let gitignore = r#"# Build output
@@ -979,31 +981,31 @@ database:
     );
     std::fs::write(project_dir.join("config/app.cln"), config_cln)?;
 
-    // Create frame.toml
-    let frame_toml = format!(
-        r#"[project]
-name = "{name}"
-version = "0.1.0"
-description = "A Frame full-stack web application"
+    // Create config.cln
+    let config_cln_root = format!(
+        r#"// {name} Configuration
 
-[server]
-port = {port}
-host = "127.0.0.1"
-entry = "app/api/main.cln"
+config:
+	project:
+		name = "{name}"
+		version = "0.1.0"
+		description = "A Frame full-stack web application"
 
-[database]
-driver = "sqlite"
-path = "db/{name}.db"
+	build:
+		output = "dist"
 
-[plugins]
-frame.web = "1.0.0"
-frame.ui = "1.0.0"
-frame.data = "1.0.0"
+	server:
+		port = {port}
+		host = "127.0.0.1"
+
+	database:
+		driver = "sqlite"
+		path = "db/{name}.db"
 "#,
         name = name,
         port = port
     );
-    std::fs::write(project_dir.join("frame.toml"), frame_toml)?;
+    std::fs::write(project_dir.join("config.cln"), config_cln_root)?;
 
     // Create public/index.html
     let index_html = format!(
@@ -1120,23 +1122,25 @@ endpoints:
     );
     std::fs::write(project_dir.join("main.cln"), main_cln)?;
 
-    // Create frame.toml
-    let frame_toml = format!(
-        r#"[project]
-name = "{name}"
-version = "0.1.0"
+    // Create config.cln
+    let config_cln_content = format!(
+        r#"// {name} Configuration
 
-[server]
-port = {port}
-entry = "main.cln"
+config:
+	project:
+		name = "{name}"
+		version = "0.1.0"
 
-[plugins]
-frame.web = "1.0.0"
+	build:
+		output = "dist"
+
+	server:
+		port = {port}
 "#,
         name = name,
         port = port
     );
-    std::fs::write(project_dir.join("frame.toml"), frame_toml)?;
+    std::fs::write(project_dir.join("config.cln"), config_cln_content)?;
 
     // Create .gitignore
     let gitignore = r#"dist/
@@ -1149,56 +1153,16 @@ frame.web = "1.0.0"
 
 /// Build a Frame project for production
 pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
-    let config = Config::load()?;
+    use crate::core::{discovery, codegen};
 
+    let config = Config::load()?;
     let input_path = Path::new(input);
 
-    // Determine entry file
-    let entry_file = if input_path.is_file() {
-        input_path.to_path_buf()
-    } else if input_path.is_dir() {
-        // Look for frame.toml to find entry point
-        let frame_toml = input_path.join("frame.toml");
-        if frame_toml.exists() {
-            // Parse frame.toml to find entry
-            let toml_content = std::fs::read_to_string(&frame_toml)?;
-            if let Some(entry) = parse_entry_from_toml(&toml_content) {
-                input_path.join(entry)
-            } else {
-                // Default entry points
-                let default_entries = [
-                    "app/api/main.cln",
-                    "main.cln",
-                    "src/main.cln",
-                ];
-                default_entries
-                    .iter()
-                    .map(|e| input_path.join(e))
-                    .find(|p| p.exists())
-                    .ok_or_else(|| CleenError::FileNotFound {
-                        path: "Entry file not found".to_string(),
-                    })?
-            }
-        } else {
-            // No frame.toml, try default entries
-            let default_entries = [
-                "app/api/main.cln",
-                "main.cln",
-                "src/main.cln",
-            ];
-            default_entries
-                .iter()
-                .map(|e| input_path.join(e))
-                .find(|p| p.exists())
-                .ok_or_else(|| CleenError::FileNotFound {
-                    path: "Entry file not found".to_string(),
-                })?
-        }
-    } else {
+    if !input_path.exists() {
         return Err(CleenError::FileNotFound {
             path: input.to_string(),
         });
-    };
+    }
 
     // Find compiler
     let cln_path = config.get_shim_path();
@@ -1214,13 +1178,75 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
     };
     std::fs::create_dir_all(&output_dir)?;
 
-    // Determine output file name
-    let wasm_name = entry_file
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("app");
+    // Check if project uses auto-discovery structure (app/ folder)
+    let app_dir = input_path.join("app");
+    let uses_discovery = app_dir.exists() && app_dir.is_dir();
+
+    let (entry_file, wasm_name) = if input_path.is_file() {
+        // Direct file path provided
+        let name = input_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("app")
+            .to_string();
+        (input_path.to_path_buf(), name)
+    } else if uses_discovery {
+        // Use automatic discovery
+        println!("Discovering project files...");
+        let discovered = discovery::discover_project(input_path)
+            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+
+        if discovered.is_empty() {
+            return Err(CleenError::CompilationFailed {
+                message: "No files discovered in app/ directory".to_string(),
+            });
+        }
+
+        println!("   Found {} pages, {} components, {} API routes, {} models",
+            discovered.pages.len(),
+            discovered.components.len(),
+            discovered.api_routes.len(),
+            discovered.models.len()
+        );
+
+        // Generate main.cln
+        let options = codegen::CodegenOptions {
+            debug_comments: true,
+            generate_registry: !discovered.components.is_empty(),
+        };
+
+        let generated = codegen::generate_code(&discovered, input_path, &options)
+            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+
+        // Write generated files
+        codegen::write_generated_code(&generated, &output_dir)
+            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+
+        println!("   Generated main.cln");
+
+        // Copy public assets if they exist
+        if let Some(public_dir) = &discovered.public_dir {
+            let public_out = output_dir.join("public");
+            copy_dir_recursive(public_dir, &public_out)?;
+            println!("   Copied public assets");
+        }
+
+        let gen_main = output_dir.join(".generated").join("main.cln");
+        (gen_main, "app".to_string())
+    } else {
+        // Legacy mode: use explicit entry file
+        let entry = find_entry_file(input_path)?;
+        let name = entry
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("app")
+            .to_string();
+        (entry, name)
+    };
+
     let wasm_path = output_dir.join(format!("{}.wasm", wasm_name));
 
+    println!();
     println!("Building Frame project...");
     println!("   Entry: {:?}", entry_file);
     println!("   Output: {:?}", wasm_path);
@@ -1242,7 +1268,7 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
 
     if !compile_output.status.success() {
         let stderr = String::from_utf8_lossy(&compile_output.stderr);
-        println!("❌ Build failed:");
+        println!("Build failed:");
         println!("{stderr}");
         return Err(CleenError::CompilationFailed {
             message: stderr.to_string(),
@@ -1253,20 +1279,74 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
     let metadata = std::fs::metadata(&wasm_path)?;
     let size_kb = metadata.len() as f64 / 1024.0;
 
-    println!("✅ Build successful!");
+    println!("Build successful!");
     println!();
     println!("   Output: {:?}", wasm_path);
     println!("   Size: {:.1} KB", size_kb);
     println!();
-    println!("To run in production:");
-    println!("   frame-runtime {:?}", wasm_path);
+    println!("To run:");
+    println!("   cleen server run {:?}", wasm_path);
 
     Ok(())
 }
 
-/// Parse entry point from frame.toml content
-fn parse_entry_from_toml(content: &str) -> Option<String> {
-    // Simple parsing - look for entry = "..."
+/// Find entry file in a project directory (legacy mode)
+fn find_entry_file(project_dir: &Path) -> Result<PathBuf> {
+    // Look for config.cln to find entry point
+    let config_cln = project_dir.join("config.cln");
+    if config_cln.exists() {
+        let config_content = std::fs::read_to_string(&config_cln)?;
+        if let Some(entry) = parse_entry_from_config(&config_content) {
+            return Ok(project_dir.join(entry));
+        }
+    }
+
+    // Try default entry points
+    let default_entries = [
+        "app/api/main.cln",
+        "main.cln",
+        "src/main.cln",
+        "app-db.cln",
+    ];
+
+    for entry in default_entries {
+        let path = project_dir.join(entry);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    Err(CleenError::FileNotFound {
+        path: "Entry file not found. Create app/ folder or main.cln".to_string(),
+    })
+}
+
+/// Copy directory recursively
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    if !src.exists() {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(dst)?;
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest_path = dst.join(entry.file_name());
+
+        if path.is_dir() {
+            copy_dir_recursive(&path, &dest_path)?;
+        } else {
+            std::fs::copy(&path, &dest_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Parse entry point from config.cln content
+fn parse_entry_from_config(content: &str) -> Option<String> {
+    // Simple parsing - look for entry = "..." in Clean Language config
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with("entry") {
@@ -1277,4 +1357,296 @@ fn parse_entry_from_toml(content: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Scan and discover project files (dry-run for build)
+pub fn scan_project(project_dir: &str, format: &str, verbose: bool) -> Result<()> {
+    use crate::core::discovery;
+
+    let project_path = Path::new(project_dir);
+    if !project_path.exists() {
+        return Err(CleenError::FileNotFound {
+            path: project_dir.to_string(),
+        });
+    }
+
+    let discovered = discovery::discover_project(project_path)
+        .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+
+    if format == "json" {
+        print_discovered_json(&discovered, project_path, verbose);
+    } else {
+        print_discovered_text(&discovered, project_path, verbose);
+    }
+
+    Ok(())
+}
+
+/// Print discovered project in JSON format
+fn print_discovered_json(
+    discovered: &crate::core::discovery::DiscoveredProject,
+    project_path: &Path,
+    verbose: bool,
+) {
+    println!("{{");
+    println!("  \"project\": {:?},", project_path.display());
+
+    // Pages
+    println!("  \"pages\": [");
+    for (i, page) in discovered.pages.iter().enumerate() {
+        let comma = if i < discovered.pages.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"path\": {:?}, \"file\": {:?} }}{}",
+                page.path,
+                page.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", page.path, comma);
+        }
+    }
+    println!("  ],");
+
+    // Components
+    println!("  \"components\": [");
+    for (i, comp) in discovered.components.iter().enumerate() {
+        let comma = if i < discovered.components.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"tag\": {:?}, \"class\": {:?}, \"file\": {:?} }}{}",
+                comp.tag,
+                comp.class_name,
+                comp.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", comp.tag, comma);
+        }
+    }
+    println!("  ],");
+
+    // API routes
+    println!("  \"api_routes\": [");
+    for (i, api) in discovered.api_routes.iter().enumerate() {
+        let comma = if i < discovered.api_routes.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"method\": {:?}, \"path\": {:?}, \"file\": {:?} }}{}",
+                api.method,
+                api.path,
+                api.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", api.path, comma);
+        }
+    }
+    println!("  ],");
+
+    // Models
+    println!("  \"models\": [");
+    for (i, model) in discovered.models.iter().enumerate() {
+        let comma = if i < discovered.models.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"name\": {:?}, \"table\": {:?}, \"file\": {:?} }}{}",
+                model.name,
+                model.table,
+                model.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", model.name, comma);
+        }
+    }
+    println!("  ],");
+
+    // Middleware
+    println!("  \"middleware\": [");
+    for (i, mw) in discovered.middleware.iter().enumerate() {
+        let comma = if i < discovered.middleware.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"name\": {:?}, \"file\": {:?} }}{}",
+                mw.name,
+                mw.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", mw.name, comma);
+        }
+    }
+    println!("  ],");
+
+    // Layouts
+    println!("  \"layouts\": [");
+    for (i, layout) in discovered.layouts.iter().enumerate() {
+        let comma = if i < discovered.layouts.len() - 1 { "," } else { "" };
+        if verbose {
+            println!(
+                "    {{ \"name\": {:?}, \"file\": {:?} }}{}",
+                layout.name,
+                layout.source_file.display(),
+                comma
+            );
+        } else {
+            println!("    {:?}{}", layout.name, comma);
+        }
+    }
+    println!("  ],");
+
+    // Public dir
+    if let Some(public_dir) = &discovered.public_dir {
+        println!("  \"public_dir\": {:?}", public_dir.display());
+    } else {
+        println!("  \"public_dir\": null");
+    }
+
+    println!("}}");
+}
+
+/// Print discovered project in human-readable text format
+fn print_discovered_text(
+    discovered: &crate::core::discovery::DiscoveredProject,
+    project_path: &Path,
+    verbose: bool,
+) {
+    println!("Project: {}", project_path.display());
+    println!();
+
+    if discovered.is_empty() {
+        println!("No files discovered.");
+        println!();
+        println!("Expected structure:");
+        println!("  app/");
+        println!("    ui/");
+        println!("      pages/          HTML page routes (.html.cln)");
+        println!("      components/     Custom elements (.cln)");
+        println!("      layouts/        Page layouts (.html.cln)");
+        println!("      public/         Static assets");
+        println!("    server/");
+        println!("      api/            JSON API routes (.cln)");
+        println!("      models/         Database models (.cln)");
+        println!("      middleware/     Request filters (.cln)");
+        println!("    shared/");
+        println!("      lib/            Utility modules (.cln)");
+        return;
+    }
+
+    let total = discovered.total_count();
+    println!("Discovered {} items:", total);
+    println!();
+
+    // Pages
+    if !discovered.pages.is_empty() {
+        println!("Pages ({}):", discovered.pages.len());
+        for page in &discovered.pages {
+            if verbose {
+                println!(
+                    "  {} {} <- {}",
+                    page.method,
+                    page.path,
+                    page.source_file.strip_prefix(project_path).unwrap_or(&page.source_file).display()
+                );
+            } else {
+                println!("  {} {}", page.method, page.path);
+            }
+        }
+        println!();
+    }
+
+    // Components
+    if !discovered.components.is_empty() {
+        println!("Components ({}):", discovered.components.len());
+        for comp in &discovered.components {
+            if verbose {
+                println!(
+                    "  <{}> (class: {}) <- {}",
+                    comp.tag,
+                    comp.class_name,
+                    comp.source_file.strip_prefix(project_path).unwrap_or(&comp.source_file).display()
+                );
+            } else {
+                println!("  <{}>", comp.tag);
+            }
+        }
+        println!();
+    }
+
+    // API routes
+    if !discovered.api_routes.is_empty() {
+        println!("API Routes ({}):", discovered.api_routes.len());
+        for api in &discovered.api_routes {
+            if verbose {
+                println!(
+                    "  {} {} <- {}",
+                    api.method,
+                    api.path,
+                    api.source_file.strip_prefix(project_path).unwrap_or(&api.source_file).display()
+                );
+            } else {
+                println!("  {} {}", api.method, api.path);
+            }
+        }
+        println!();
+    }
+
+    // Models
+    if !discovered.models.is_empty() {
+        println!("Models ({}):", discovered.models.len());
+        for model in &discovered.models {
+            if verbose {
+                println!(
+                    "  {} (table: {}) <- {}",
+                    model.name,
+                    model.table,
+                    model.source_file.strip_prefix(project_path).unwrap_or(&model.source_file).display()
+                );
+            } else {
+                println!("  {} -> {}", model.name, model.table);
+            }
+        }
+        println!();
+    }
+
+    // Middleware
+    if !discovered.middleware.is_empty() {
+        println!("Middleware ({}):", discovered.middleware.len());
+        for mw in &discovered.middleware {
+            if verbose {
+                println!(
+                    "  {} <- {}",
+                    mw.name,
+                    mw.source_file.strip_prefix(project_path).unwrap_or(&mw.source_file).display()
+                );
+            } else {
+                println!("  {}", mw.name);
+            }
+        }
+        println!();
+    }
+
+    // Layouts
+    if !discovered.layouts.is_empty() {
+        println!("Layouts ({}):", discovered.layouts.len());
+        for layout in &discovered.layouts {
+            if verbose {
+                println!(
+                    "  {} <- {}",
+                    layout.name,
+                    layout.source_file.strip_prefix(project_path).unwrap_or(&layout.source_file).display()
+                );
+            } else {
+                println!("  {}", layout.name);
+            }
+        }
+        println!();
+    }
+
+    // Public directory
+    if let Some(public_dir) = &discovered.public_dir {
+        println!("Public directory: {}", public_dir.display());
+        println!();
+    }
 }

@@ -10,9 +10,17 @@ homepage = "https://github.com/Ivan-Pasco/clean-language-manager"
 keywords = ["clean", "language", "compiler", "version-manager"]
 categories = ["development-tools"]
 
+[lib]
+name = "cleen"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cleen"
 path = "src/main.rs"
+
+[[bin]]
+name = "frame"
+path = "src/bin/frame.rs"
 
 [dependencies]
 # CLI

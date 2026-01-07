@@ -552,7 +552,7 @@ myapp/
 ├── config/
 │   └── app.cln              # Configuration
 ├── dist/                    # Build output
-├── frame.toml               # Project manifest
+├── config.cln               # Project configuration
 └── .gitignore
 ```
 
@@ -565,7 +565,7 @@ cleen frame build
 ```
 
 This will:
-1. Find the entry point (from `frame.toml` or default locations)
+1. Find the entry point (from `config.cln` or default locations)
 2. Compile with plugin support
 3. Optimize the WASM output
 4. Output to `dist/` directory
