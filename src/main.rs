@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 // Use the library modules
-use cleen::{commands, core, error, plugin};
+use cleen::{commands, core};
 
 #[derive(Parser)]
 #[clap(name = "cleen")]

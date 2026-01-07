@@ -5,7 +5,7 @@
 //! - Route registration in start()
 //! - Component imports and registry
 
-use crate::core::discovery::{ApiRoute, Component, DiscoveredProject, Model, PageRoute};
+use crate::core::discovery::{ApiRoute, Component, DiscoveredProject, PageRoute};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
@@ -420,8 +420,8 @@ fn extract_route_params(path: &str) -> Vec<String> {
     let mut params = Vec::new();
 
     for segment in path.split('/') {
-        if segment.starts_with(':') {
-            params.push(segment[1..].to_string());
+        if let Some(stripped) = segment.strip_prefix(':') {
+            params.push(stripped.to_string());
         }
     }
 
@@ -630,6 +630,7 @@ fn escape_html_for_clean_with_calls(html: &str) -> String {
 }
 
 /// Escape HTML content for embedding in Clean Language strings
+#[allow(dead_code)]
 fn escape_html_for_clean(html: &str) -> String {
     let mut result = String::new();
     let mut chars = html.chars().peekable();

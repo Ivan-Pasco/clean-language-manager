@@ -273,7 +273,11 @@ fn discover_pages(dir: &Path, base_dir: &Path, project: &mut DiscoveredProject) 
 }
 
 /// Recursively discover components
-fn discover_components(dir: &Path, base_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
+fn discover_components(
+    dir: &Path,
+    _base_dir: &Path,
+    project: &mut DiscoveredProject,
+) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
@@ -283,7 +287,7 @@ fn discover_components(dir: &Path, base_dir: &Path, project: &mut DiscoveredProj
         let path = entry.path();
 
         if path.is_dir() {
-            discover_components(&path, base_dir, project)?;
+            discover_components(&path, _base_dir, project)?;
         } else if is_cln_file(&path) {
             let class_name = path
                 .file_stem()
@@ -548,9 +552,8 @@ fn convert_params(path: &str) -> String {
 ///   BlogPostPreview -> blog-post-preview
 fn class_name_to_tag(class_name: &str) -> String {
     let mut result = String::new();
-    let mut chars = class_name.chars().peekable();
 
-    while let Some(ch) = chars.next() {
+    for ch in class_name.chars() {
         if ch.is_uppercase() {
             if !result.is_empty() {
                 result.push('-');

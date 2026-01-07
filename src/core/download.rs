@@ -7,6 +7,12 @@ use zip::ZipArchive;
 
 pub struct Downloader;
 
+impl Default for Downloader {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl Downloader {
     pub fn new() -> Self {
         Self
