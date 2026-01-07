@@ -941,7 +941,10 @@ component: name="Header"
 "#,
         name = name
     );
-    std::fs::write(project_dir.join("app/components/header.cln"), header_component)?;
+    std::fs::write(
+        project_dir.join("app/components/header.cln"),
+        header_component,
+    )?;
 
     // Create db/schema.cln
     let schema = r#"// Database Schema
@@ -1153,7 +1156,7 @@ config:
 
 /// Build a Frame project for production
 pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
-    use crate::core::{discovery, codegen};
+    use crate::core::{codegen, discovery};
 
     let config = Config::load()?;
     let input_path = Path::new(input);
@@ -1193,8 +1196,10 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
     } else if uses_discovery {
         // Use automatic discovery
         println!("Discovering project files...");
-        let discovered = discovery::discover_project(input_path)
-            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+        let discovered =
+            discovery::discover_project(input_path).map_err(|e| CleenError::CompilationFailed {
+                message: e.to_string(),
+            })?;
 
         if discovered.is_empty() {
             return Err(CleenError::CompilationFailed {
@@ -1202,7 +1207,8 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
             });
         }
 
-        println!("   Found {} pages, {} components, {} API routes, {} models",
+        println!(
+            "   Found {} pages, {} components, {} API routes, {} models",
             discovered.pages.len(),
             discovered.components.len(),
             discovered.api_routes.len(),
@@ -1215,12 +1221,18 @@ pub fn build_project(input: &str, output: &str, optimize: &str) -> Result<()> {
             generate_registry: !discovered.components.is_empty(),
         };
 
-        let generated = codegen::generate_code(&discovered, input_path, &options)
-            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+        let generated = codegen::generate_code(&discovered, input_path, &options).map_err(|e| {
+            CleenError::CompilationFailed {
+                message: e.to_string(),
+            }
+        })?;
 
         // Write generated files
-        codegen::write_generated_code(&generated, &output_dir)
-            .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+        codegen::write_generated_code(&generated, &output_dir).map_err(|e| {
+            CleenError::CompilationFailed {
+                message: e.to_string(),
+            }
+        })?;
 
         println!("   Generated main.cln");
 
@@ -1302,12 +1314,7 @@ fn find_entry_file(project_dir: &Path) -> Result<PathBuf> {
     }
 
     // Try default entry points
-    let default_entries = [
-        "app/api/main.cln",
-        "main.cln",
-        "src/main.cln",
-        "app-db.cln",
-    ];
+    let default_entries = ["app/api/main.cln", "main.cln", "src/main.cln", "app-db.cln"];
 
     for entry in default_entries {
         let path = project_dir.join(entry);
@@ -1370,8 +1377,10 @@ pub fn scan_project(project_dir: &str, format: &str, verbose: bool) -> Result<()
         });
     }
 
-    let discovered = discovery::discover_project(project_path)
-        .map_err(|e| CleenError::CompilationFailed { message: e.to_string() })?;
+    let discovered =
+        discovery::discover_project(project_path).map_err(|e| CleenError::CompilationFailed {
+            message: e.to_string(),
+        })?;
 
     if format == "json" {
         print_discovered_json(&discovered, project_path, verbose);
@@ -1394,7 +1403,11 @@ fn print_discovered_json(
     // Pages
     println!("  \"pages\": [");
     for (i, page) in discovered.pages.iter().enumerate() {
-        let comma = if i < discovered.pages.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.pages.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"path\": {:?}, \"file\": {:?} }}{}",
@@ -1411,7 +1424,11 @@ fn print_discovered_json(
     // Components
     println!("  \"components\": [");
     for (i, comp) in discovered.components.iter().enumerate() {
-        let comma = if i < discovered.components.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.components.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"tag\": {:?}, \"class\": {:?}, \"file\": {:?} }}{}",
@@ -1429,7 +1446,11 @@ fn print_discovered_json(
     // API routes
     println!("  \"api_routes\": [");
     for (i, api) in discovered.api_routes.iter().enumerate() {
-        let comma = if i < discovered.api_routes.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.api_routes.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"method\": {:?}, \"path\": {:?}, \"file\": {:?} }}{}",
@@ -1447,7 +1468,11 @@ fn print_discovered_json(
     // Models
     println!("  \"models\": [");
     for (i, model) in discovered.models.iter().enumerate() {
-        let comma = if i < discovered.models.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.models.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"name\": {:?}, \"table\": {:?}, \"file\": {:?} }}{}",
@@ -1465,7 +1490,11 @@ fn print_discovered_json(
     // Middleware
     println!("  \"middleware\": [");
     for (i, mw) in discovered.middleware.iter().enumerate() {
-        let comma = if i < discovered.middleware.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.middleware.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"name\": {:?}, \"file\": {:?} }}{}",
@@ -1482,7 +1511,11 @@ fn print_discovered_json(
     // Layouts
     println!("  \"layouts\": [");
     for (i, layout) in discovered.layouts.iter().enumerate() {
-        let comma = if i < discovered.layouts.len() - 1 { "," } else { "" };
+        let comma = if i < discovered.layouts.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         if verbose {
             println!(
                 "    {{ \"name\": {:?}, \"file\": {:?} }}{}",
@@ -1547,7 +1580,10 @@ fn print_discovered_text(
                     "  {} {} <- {}",
                     page.method,
                     page.path,
-                    page.source_file.strip_prefix(project_path).unwrap_or(&page.source_file).display()
+                    page.source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&page.source_file)
+                        .display()
                 );
             } else {
                 println!("  {} {}", page.method, page.path);
@@ -1565,7 +1601,10 @@ fn print_discovered_text(
                     "  <{}> (class: {}) <- {}",
                     comp.tag,
                     comp.class_name,
-                    comp.source_file.strip_prefix(project_path).unwrap_or(&comp.source_file).display()
+                    comp.source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&comp.source_file)
+                        .display()
                 );
             } else {
                 println!("  <{}>", comp.tag);
@@ -1583,7 +1622,10 @@ fn print_discovered_text(
                     "  {} {} <- {}",
                     api.method,
                     api.path,
-                    api.source_file.strip_prefix(project_path).unwrap_or(&api.source_file).display()
+                    api.source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&api.source_file)
+                        .display()
                 );
             } else {
                 println!("  {} {}", api.method, api.path);
@@ -1601,7 +1643,11 @@ fn print_discovered_text(
                     "  {} (table: {}) <- {}",
                     model.name,
                     model.table,
-                    model.source_file.strip_prefix(project_path).unwrap_or(&model.source_file).display()
+                    model
+                        .source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&model.source_file)
+                        .display()
                 );
             } else {
                 println!("  {} -> {}", model.name, model.table);
@@ -1618,7 +1664,10 @@ fn print_discovered_text(
                 println!(
                     "  {} <- {}",
                     mw.name,
-                    mw.source_file.strip_prefix(project_path).unwrap_or(&mw.source_file).display()
+                    mw.source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&mw.source_file)
+                        .display()
                 );
             } else {
                 println!("  {}", mw.name);
@@ -1635,7 +1684,11 @@ fn print_discovered_text(
                 println!(
                     "  {} <- {}",
                     layout.name,
-                    layout.source_file.strip_prefix(project_path).unwrap_or(&layout.source_file).display()
+                    layout
+                        .source_file
+                        .strip_prefix(project_path)
+                        .unwrap_or(&layout.source_file)
+                        .display()
                 );
             } else {
                 println!("  {}", layout.name);

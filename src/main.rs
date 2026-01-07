@@ -300,8 +300,9 @@ fn main() -> Result<()> {
                 name,
                 template,
                 port,
-            } => core::frame::create_project(&name, &template, port)
-                .map_err(|e| anyhow::anyhow!(e)),
+            } => {
+                core::frame::create_project(&name, &template, port).map_err(|e| anyhow::anyhow!(e))
+            }
             FrameCommands::Scan {
                 project,
                 format,
@@ -389,9 +390,7 @@ fn main() -> Result<()> {
             ServerCommands::Install { version } => {
                 core::server::install_server(version.as_deref()).map_err(|e| anyhow::anyhow!(e))
             }
-            ServerCommands::List => {
-                core::server::list_versions().map_err(|e| anyhow::anyhow!(e))
-            }
+            ServerCommands::List => core::server::list_versions().map_err(|e| anyhow::anyhow!(e)),
             ServerCommands::Use { version } => {
                 core::server::use_version(&version).map_err(|e| anyhow::anyhow!(e))
             }
@@ -403,9 +402,7 @@ fn main() -> Result<()> {
                 port,
                 host,
             } => core::server::run_wasm(&wasm_file, port, &host).map_err(|e| anyhow::anyhow!(e)),
-            ServerCommands::Status => {
-                core::server::show_status().map_err(|e| anyhow::anyhow!(e))
-            }
+            ServerCommands::Status => core::server::show_status().map_err(|e| anyhow::anyhow!(e)),
         },
     };
 

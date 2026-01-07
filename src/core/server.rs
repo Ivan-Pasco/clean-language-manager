@@ -244,9 +244,8 @@ pub fn uninstall_version(version: &str) -> Result<()> {
 pub fn run_wasm(wasm_file: &str, port: u16, host: &str) -> Result<()> {
     let config = Config::load()?;
 
-    let binary_path = get_server_binary_path(&config).ok_or_else(|| {
-        CleenError::NoServerInstalled
-    })?;
+    let binary_path =
+        get_server_binary_path(&config).ok_or_else(|| CleenError::NoServerInstalled)?;
 
     if !binary_path.exists() {
         return Err(CleenError::NoServerInstalled);

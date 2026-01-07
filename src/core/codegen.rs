@@ -5,10 +5,10 @@
 //! - Route registration in start()
 //! - Component imports and registry
 
-use std::path::Path;
+use crate::core::discovery::{ApiRoute, Component, DiscoveredProject, Model, PageRoute};
+use anyhow::{Context, Result};
 use std::fs;
-use anyhow::{Result, Context};
-use crate::core::discovery::{DiscoveredProject, PageRoute, ApiRoute, Component, Model};
+use std::path::Path;
 
 /// Code generation options
 #[derive(Debug, Default)]
@@ -68,13 +68,24 @@ pub fn generate_code(
 
     // Page handlers (with component expansion)
     for page in &project.pages {
-        main_cln.push_str(&generate_page_handler(page, project_dir, handler_index, &project.components, options)?);
+        main_cln.push_str(&generate_page_handler(
+            page,
+            project_dir,
+            handler_index,
+            &project.components,
+            options,
+        )?);
         handler_index += 1;
     }
 
     // API handlers
     for api in &project.api_routes {
-        main_cln.push_str(&generate_api_handler(api, project_dir, handler_index, options)?);
+        main_cln.push_str(&generate_api_handler(
+            api,
+            project_dir,
+            handler_index,
+            options,
+        )?);
         handler_index += 1;
     }
 
@@ -106,21 +117,33 @@ fn generate_component_render_function(
     let mut output = String::new();
 
     if options.debug_comments {
-        output.push_str(&format!("\t// Component: <{}> from {}\n",
+        output.push_str(&format!(
+            "\t// Component: <{}> from {}\n",
             component.tag,
-            component.source_file.file_name().unwrap_or_default().to_string_lossy()
+            component
+                .source_file
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
         ));
     }
 
     // Read component source
-    let content = fs::read_to_string(&component.source_file)
-        .with_context(|| format!("Failed to read component: {}", component.source_file.display()))?;
+    let content = fs::read_to_string(&component.source_file).with_context(|| {
+        format!(
+            "Failed to read component: {}",
+            component.source_file.display()
+        )
+    })?;
 
     // Extract render function body
     let render_body = extract_component_render_body(&content)?;
 
     // Generate function with unique name based on class_name
-    output.push_str(&format!("\tstring __component_{}_render()\n", component.class_name));
+    output.push_str(&format!(
+        "\tstring __component_{}_render()\n",
+        component.class_name
+    ));
     output.push_str(&indent_code(&render_body, 2));
     output.push_str("\n\n");
 
@@ -213,7 +236,10 @@ fn generate_page_handler(
         handler.push_str(&format!(
             "\t// Handler for {} (from {})\n",
             page.path,
-            page.source_file.strip_prefix(project_dir).unwrap_or(&page.source_file).display()
+            page.source_file
+                .strip_prefix(project_dir)
+                .unwrap_or(&page.source_file)
+                .display()
         ));
     }
 
@@ -222,7 +248,10 @@ fn generate_page_handler(
     // Extract route parameters
     let params = extract_route_params(&page.path);
     for param in &params {
-        handler.push_str(&format!("\t\tstring {} = _req_param(\"{}\")\n", param, param));
+        handler.push_str(&format!(
+            "\t\tstring {} = _req_param(\"{}\")\n",
+            param, param
+        ));
     }
 
     // Read and inline the page source (with component expansion)
@@ -247,7 +276,10 @@ fn generate_api_handler(
             "\t// API handler for {} {} (from {})\n",
             api.method,
             api.path,
-            api.source_file.strip_prefix(project_dir).unwrap_or(&api.source_file).display()
+            api.source_file
+                .strip_prefix(project_dir)
+                .unwrap_or(&api.source_file)
+                .display()
         ));
     }
 
@@ -256,7 +288,10 @@ fn generate_api_handler(
     // Extract route parameters
     let params = extract_route_params(&api.path);
     for param in &params {
-        handler.push_str(&format!("\t\tstring {} = _req_param(\"{}\")\n", param, param));
+        handler.push_str(&format!(
+            "\t\tstring {} = _req_param(\"{}\")\n",
+            param, param
+        ));
     }
 
     // Read and inline the API source
@@ -268,7 +303,10 @@ fn generate_api_handler(
 }
 
 /// Generate the start() function with route registration
-fn generate_start_function(project: &DiscoveredProject, options: &CodegenOptions) -> Result<String> {
+fn generate_start_function(
+    project: &DiscoveredProject,
+    options: &CodegenOptions,
+) -> Result<String> {
     let mut start = String::new();
 
     start.push_str("\nstart()\n");
@@ -309,9 +347,7 @@ fn generate_start_function(project: &DiscoveredProject, options: &CodegenOptions
 
 /// Generate model import/include
 fn generate_model_import(source_file: &Path, project_dir: &Path) -> Result<String> {
-    let relative = source_file
-        .strip_prefix(project_dir)
-        .unwrap_or(source_file);
+    let relative = source_file.strip_prefix(project_dir).unwrap_or(source_file);
     Ok(format!("// include: {}\n", relative.display()))
 }
 
@@ -341,11 +377,12 @@ fn build_compile_order(project: &DiscoveredProject, project_dir: &Path) -> Resul
     // Models first (they define data structures)
     for model in &project.models {
         order.push(
-            model.source_file
+            model
+                .source_file
                 .strip_prefix(project_dir)
                 .unwrap_or(&model.source_file)
                 .to_string_lossy()
-                .to_string()
+                .to_string(),
         );
     }
 
@@ -356,18 +393,19 @@ fn build_compile_order(project: &DiscoveredProject, project_dir: &Path) -> Resul
                 .strip_prefix(project_dir)
                 .unwrap_or(&lib.source_file)
                 .to_string_lossy()
-                .to_string()
+                .to_string(),
         );
     }
 
     // Components
     for component in &project.components {
         order.push(
-            component.source_file
+            component
+                .source_file
                 .strip_prefix(project_dir)
                 .unwrap_or(&component.source_file)
                 .to_string_lossy()
-                .to_string()
+                .to_string(),
         );
     }
 
@@ -412,7 +450,9 @@ fn convert_html_to_clean(html: &str, components: &[Component]) -> Result<String>
 
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
-        if trimmed.contains("<script type=\"text/clean\">") || trimmed.contains("<script type='text/clean'>") {
+        if trimmed.contains("<script type=\"text/clean\">")
+            || trimmed.contains("<script type='text/clean'>")
+        {
             in_script = true;
             script_start = i;
         } else if in_script && trimmed.contains("</script>") {
@@ -429,7 +469,9 @@ fn convert_html_to_clean(html: &str, components: &[Component]) -> Result<String>
 
     // Remove script block from lines if found
     if script_end > script_start {
-        lines = lines.iter().enumerate()
+        lines = lines
+            .iter()
+            .enumerate()
             .filter(|(i, _)| *i < script_start || *i > script_end)
             .map(|(_, l)| *l)
             .collect();
@@ -496,22 +538,13 @@ fn expand_component_tags(line: &str, components: &[Component]) -> String {
         // Also match just opening/closing if on same line
         if result.contains(&self_closing) {
             // Replace with function call
-            let replacement = format!(
-                "\" + __component_{}_render() + \"",
-                component.class_name
-            );
+            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
             result = result.replace(&self_closing, &replacement);
         } else if result.contains(&self_closing_short) {
-            let replacement = format!(
-                "\" + __component_{}_render() + \"",
-                component.class_name
-            );
+            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
             result = result.replace(&self_closing_short, &replacement);
         } else if result.contains(&self_closing_nospace) {
-            let replacement = format!(
-                "\" + __component_{}_render() + \"",
-                component.class_name
-            );
+            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
             result = result.replace(&self_closing_nospace, &replacement);
         }
     }
@@ -544,7 +577,7 @@ fn escape_html_for_clean_with_calls(html: &str) -> String {
             result.push(c);
             if chars.peek() == Some(&')') {
                 result.push(chars.next().unwrap()); // )
-                // Look for + "
+                                                    // Look for + "
                 if chars.peek() == Some(&' ') {
                     result.push(chars.next().unwrap()); // space
                     if chars.peek() == Some(&'+') {
@@ -654,13 +687,9 @@ fn indent_code(code: &str, tabs: usize) -> String {
 }
 
 /// Write generated code to disk
-pub fn write_generated_code(
-    generated: &GeneratedCode,
-    output_dir: &Path,
-) -> Result<()> {
+pub fn write_generated_code(generated: &GeneratedCode, output_dir: &Path) -> Result<()> {
     let gen_dir = output_dir.join(".generated");
-    fs::create_dir_all(&gen_dir)
-        .context("Failed to create .generated directory")?;
+    fs::create_dir_all(&gen_dir).context("Failed to create .generated directory")?;
 
     // Write main.cln
     fs::write(gen_dir.join("main.cln"), &generated.main_cln)
@@ -684,7 +713,10 @@ mod tests {
         assert_eq!(extract_route_params("/"), Vec::<String>::new());
         assert_eq!(extract_route_params("/about"), Vec::<String>::new());
         assert_eq!(extract_route_params("/blog/:slug"), vec!["slug"]);
-        assert_eq!(extract_route_params("/users/:id/posts/:postId"), vec!["id", "postId"]);
+        assert_eq!(
+            extract_route_params("/users/:id/posts/:postId"),
+            vec!["id", "postId"]
+        );
     }
 
     #[test]

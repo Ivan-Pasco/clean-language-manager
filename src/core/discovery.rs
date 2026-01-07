@@ -8,9 +8,9 @@
 //! - Models (app/server/models/) -> Database schemas
 //! - Middleware (app/server/middleware/) -> Request filters
 
-use std::path::{Path, PathBuf};
+use anyhow::{Context, Result};
 use std::fs;
-use anyhow::{Result, Context};
+use std::path::{Path, PathBuf};
 
 /// A discovered HTML page route
 #[derive(Debug, Clone)]
@@ -242,11 +242,7 @@ fn discover_shared(shared_dir: &Path, project: &mut DiscoveredProject) -> Result
 }
 
 /// Recursively discover page routes
-fn discover_pages(
-    dir: &Path,
-    base_dir: &Path,
-    project: &mut DiscoveredProject,
-) -> Result<()> {
+fn discover_pages(dir: &Path, base_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
@@ -277,11 +273,7 @@ fn discover_pages(
 }
 
 /// Recursively discover components
-fn discover_components(
-    dir: &Path,
-    base_dir: &Path,
-    project: &mut DiscoveredProject,
-) -> Result<()> {
+fn discover_components(dir: &Path, base_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
@@ -342,11 +334,7 @@ fn discover_layouts(dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
 }
 
 /// Recursively discover API routes
-fn discover_api_routes(
-    dir: &Path,
-    base_dir: &Path,
-    project: &mut DiscoveredProject,
-) -> Result<()> {
+fn discover_api_routes(dir: &Path, base_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
@@ -465,9 +453,7 @@ fn discover_lib_modules(dir: &Path, project: &mut DiscoveredProject) -> Result<(
 
 /// Check if file is a .cln file
 fn is_cln_file(path: &Path) -> bool {
-    path.extension()
-        .map(|ext| ext == "cln")
-        .unwrap_or(false)
+    path.extension().map(|ext| ext == "cln").unwrap_or(false)
 }
 
 /// Check if file is a page file (.html.cln)
@@ -484,9 +470,7 @@ fn is_page_file(path: &Path) -> bool {
 ///   pages/blog/index.html.cln -> /blog
 ///   pages/blog/[slug].html.cln -> /blog/:slug
 fn file_to_route_path(file_path: &Path, base_dir: &Path) -> String {
-    let relative = file_path
-        .strip_prefix(base_dir)
-        .unwrap_or(file_path);
+    let relative = file_path.strip_prefix(base_dir).unwrap_or(file_path);
 
     let path_str = relative.to_string_lossy();
 
@@ -508,9 +492,7 @@ fn file_to_route_path(file_path: &Path, base_dir: &Path) -> String {
 
 /// Convert file path to API route path (with /api/ prefix)
 fn file_to_api_route_path(file_path: &Path, base_dir: &Path) -> String {
-    let relative = file_path
-        .strip_prefix(base_dir)
-        .unwrap_or(file_path);
+    let relative = file_path.strip_prefix(base_dir).unwrap_or(file_path);
 
     let path_str = relative.to_string_lossy();
 
