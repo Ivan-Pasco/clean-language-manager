@@ -486,6 +486,15 @@ pub fn serve_application(input: &str, port: u16, host: &str, debug: bool) -> Res
                         return Ok(());
                     }
                 }
+
+                #[cfg(windows)]
+                {
+                    // On Windows, just check if PID file exists and warn
+                    // TODO: Implement proper Windows process checking
+                    println!("⚠️  A Frame server may be running (PID: {pid})");
+                    println!("   Use 'cleen frame stop' to stop it first");
+                    return Ok(());
+                }
             }
         }
         // Clean up stale PID file
