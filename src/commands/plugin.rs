@@ -4,8 +4,8 @@ use crate::plugin::manifest::PluginManifest;
 use crate::plugin::registry;
 use crate::plugin::scaffold;
 use crate::plugin::{
-    get_plugin_versions, is_plugin_installed, list_installed_plugins, parse_plugin_specifier,
-    remove_plugin,
+    activate_plugin_version_root, get_plugin_versions, is_plugin_installed,
+    list_installed_plugins, parse_plugin_specifier, remove_plugin,
 };
 use std::env;
 use std::path::Path;
@@ -257,6 +257,7 @@ pub fn use_plugin_version(name: &str, version: &str) -> Result<()> {
     }
 
     config.set_active_plugin(name, version)?;
+    activate_plugin_version_root(&config, name, version)?;
 
     println!("Now using {} version {}", name, version);
 

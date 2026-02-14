@@ -1,5 +1,6 @@
 use crate::core::config::Config;
 use crate::error::{CleenError, Result};
+use crate::plugin::activate_plugin_version_root;
 use crate::plugin::manifest::PluginManifest;
 use crate::utils::fs as fs_utils;
 use std::fs;
@@ -143,8 +144,9 @@ fn download_and_install_plugin(config: &mut Config, info: &PluginInfo) -> Result
         // TODO: Implement checksum verification
     }
 
-    // Set as active version
+    // Set as active version and activate root-level files
     config.set_active_plugin(&info.name, &info.version)?;
+    activate_plugin_version_root(config, &info.name, &info.version)?;
 
     println!(
         "Plugin {}@{} installed successfully",
@@ -187,8 +189,9 @@ pub fn install_from_local(config: &mut Config, source_dir: &Path) -> Result<()> 
     fs::copy(&manifest_path, &target_manifest)?;
     fs::copy(&wasm_source, &target_wasm)?;
 
-    // Set as active version
+    // Set as active version and activate root-level files
     config.set_active_plugin(name, version)?;
+    activate_plugin_version_root(config, name, version)?;
 
     println!("Plugin {}@{} installed successfully", name, version);
     println!("Location: {}", target_dir.display());

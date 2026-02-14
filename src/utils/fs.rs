@@ -34,6 +34,24 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    ensure_dir_exists(dst)?;
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn is_executable(path: &Path) -> bool {
     #[cfg(unix)]
     {

@@ -4,6 +4,7 @@ pub mod scaffold;
 
 use crate::core::config::Config;
 use crate::error::{CleenError, Result};
+use crate::utils::fs as fs_utils;
 use manifest::PluginManifest;
 use std::fs;
 
@@ -84,8 +85,12 @@ pub fn get_plugin_versions(config: &Config, name: &str) -> Result<Vec<String>> {
         let path = entry.path();
 
         if path.is_dir() {
-            if let Some(version) = path.file_name() {
-                versions.push(version.to_string_lossy().to_string());
+            // Only include directories that contain a plugin.toml (actual version dirs)
+            let manifest = path.join("plugin.toml");
+            if manifest.exists() {
+                if let Some(version) = path.file_name() {
+                    versions.push(version.to_string_lossy().to_string());
+                }
             }
         }
     }
@@ -138,17 +143,103 @@ pub fn remove_plugin_version(config: &mut Config, name: &str, version: &str) -> 
     // Remove the version directory
     fs::remove_dir_all(&version_dir)?;
 
-    // If this was the active version, remove it from config
+    // If this was the active version, handle root-level cleanup
     if config.get_active_plugin_version(name) == Some(&version.to_string()) {
         config.remove_active_plugin(name)?;
+        clean_plugin_root_files(config, name)?;
+
+        // If another version exists, activate it automatically
+        let remaining_versions = get_plugin_versions(config, name)?;
+        if let Some(latest) = remaining_versions.first() {
+            config.set_active_plugin(name, latest)?;
+            activate_plugin_version_root(config, name, latest)?;
+        }
     }
 
-    // If no versions remain, remove the plugin directory
+    // If no versions remain, remove the plugin directory entirely
     let plugin_dir = config.get_plugin_dir(name);
     if plugin_dir.exists() {
-        let remaining = fs::read_dir(&plugin_dir)?.count();
-        if remaining == 0 {
-            fs::remove_dir(&plugin_dir)?;
+        let remaining_versions = get_plugin_versions(config, name)?;
+        if remaining_versions.is_empty() {
+            fs::remove_dir_all(&plugin_dir)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Activate a plugin version by copying its files to the plugin root directory.
+/// This ensures the compiler can find the plugin files at the root level
+/// (e.g., ~/.cleen/plugins/<name>/plugin.toml) regardless of versioned subdirectories.
+pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) -> Result<()> {
+    let version_dir = config.get_plugin_version_dir(name, version);
+    let plugin_dir = config.get_plugin_dir(name);
+
+    if !version_dir.exists() {
+        return Err(CleenError::PluginVersionNotFound {
+            name: name.to_string(),
+            version: version.to_string(),
+        });
+    }
+
+    // Copy all files from the version directory to the plugin root
+    for entry in fs::read_dir(&version_dir)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let file_name = entry.file_name();
+        let dst_path = plugin_dir.join(&file_name);
+
+        if src_path.is_dir() {
+            // Remove existing directory at root level before copying
+            if dst_path.exists() {
+                fs::remove_dir_all(&dst_path)?;
+            }
+            fs_utils::copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    // Write .active-version marker file
+    let active_version_path = plugin_dir.join(".active-version");
+    fs::write(&active_version_path, version)?;
+
+    Ok(())
+}
+
+/// Remove root-level activated files from a plugin directory,
+/// keeping only the versioned subdirectories.
+fn clean_plugin_root_files(config: &Config, name: &str) -> Result<()> {
+    let plugin_dir = config.get_plugin_dir(name);
+
+    if !plugin_dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&plugin_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip versioned subdirectories (they contain plugin.toml inside)
+        if path.is_dir() {
+            let manifest = path.join("plugin.toml");
+            if manifest.exists() {
+                continue;
+            }
+        }
+
+        // Remove root-level files and non-version directories
+        if path.is_dir() {
+            fs::remove_dir_all(&path)?;
+        } else {
+            // Keep hidden files other than .active-version for safety,
+            // but remove .active-version, plugin.toml, plugin.wasm, etc.
+            if file_name == ".active-version"
+                || !file_name.starts_with('.')
+            {
+                fs::remove_file(&path)?;
+            }
         }
     }
 

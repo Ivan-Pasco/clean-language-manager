@@ -10,6 +10,15 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
+/// Sanitize a name for use as a Clean identifier (function/variable name)
+/// Replaces hyphens with underscores and removes other invalid characters
+fn sanitize_identifier(name: &str) -> String {
+    name.chars()
+        .map(|c| if c == '-' { '_' } else { c })
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
+}
+
 /// Code generation options
 #[derive(Debug, Default)]
 pub struct CodegenOptions {
@@ -139,10 +148,10 @@ fn generate_component_render_function(
     // Extract render function body
     let render_body = extract_component_render_body(&content)?;
 
-    // Generate function with unique name based on class_name
+    // Generate function with unique name based on class_name (sanitized for valid identifier)
     output.push_str(&format!(
         "\tstring __component_{}_render()\n",
-        component.class_name
+        sanitize_identifier(&component.class_name)
     ));
     output.push_str(&indent_code(&render_body, 2));
     output.push_str("\n\n");
@@ -536,15 +545,16 @@ fn expand_component_tags(line: &str, components: &[Component]) -> String {
         let self_closing_nospace = format!("<{}/>", component.tag);
 
         // Also match just opening/closing if on same line
+        let sanitized_name = sanitize_identifier(&component.class_name);
         if result.contains(&self_closing) {
             // Replace with function call
-            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
+            let replacement = format!("\" + __component_{}_render() + \"", sanitized_name);
             result = result.replace(&self_closing, &replacement);
         } else if result.contains(&self_closing_short) {
-            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
+            let replacement = format!("\" + __component_{}_render() + \"", sanitized_name);
             result = result.replace(&self_closing_short, &replacement);
         } else if result.contains(&self_closing_nospace) {
-            let replacement = format!("\" + __component_{}_render() + \"", component.class_name);
+            let replacement = format!("\" + __component_{}_render() + \"", sanitized_name);
             result = result.replace(&self_closing_nospace, &replacement);
         }
     }
@@ -622,6 +632,9 @@ fn escape_html_for_clean_with_calls(html: &str) -> String {
                 result.push_str(&var_name);
                 result.push_str(" + \"");
             }
+            // Escape single braces with backslash for Clean Language
+            '{' => result.push_str("\\{"),
+            '}' => result.push_str("\\}"),
             _ => result.push(c),
         }
     }
