@@ -4,8 +4,8 @@ use crate::plugin::manifest::PluginManifest;
 use crate::plugin::registry;
 use crate::plugin::scaffold;
 use crate::plugin::{
-    activate_plugin_version_root, get_plugin_versions, is_plugin_installed,
-    list_installed_plugins, parse_plugin_specifier, remove_plugin,
+    activate_plugin_version_root, get_plugin_versions, is_plugin_installed, list_installed_plugins,
+    parse_plugin_specifier, remove_plugin,
 };
 use std::env;
 use std::path::Path;

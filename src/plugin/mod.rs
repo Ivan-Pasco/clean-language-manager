@@ -235,9 +235,7 @@ fn clean_plugin_root_files(config: &Config, name: &str) -> Result<()> {
         } else {
             // Keep hidden files other than .active-version for safety,
             // but remove .active-version, plugin.toml, plugin.wasm, etc.
-            if file_name == ".active-version"
-                || !file_name.starts_with('.')
-            {
+            if file_name == ".active-version" || !file_name.starts_with('.') {
                 fs::remove_file(&path)?;
             }
         }
