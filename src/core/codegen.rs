@@ -952,20 +952,14 @@ mod tests {
     fn test_interpolation_safe_escape() {
         // Bug 9: {expr} should expand to _html_escape(expr)
         let result = escape_html_line("<h3>{this.title}</h3>");
-        assert_eq!(
-            result,
-            "<h3>\" + _html_escape(this.title) + \"</h3>"
-        );
+        assert_eq!(result, "<h3>\" + _html_escape(this.title) + \"</h3>");
     }
 
     #[test]
     fn test_interpolation_raw() {
         // Bug 9: {!expr} should expand to raw expr (no escaping)
         let result = escape_html_line("<div>{!getIcon(this.icon)}</div>");
-        assert_eq!(
-            result,
-            "<div>\" + getIcon(this.icon) + \"</div>"
-        );
+        assert_eq!(result, "<div>\" + getIcon(this.icon) + \"</div>");
     }
 
     #[test]
