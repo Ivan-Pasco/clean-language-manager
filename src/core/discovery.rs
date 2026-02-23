@@ -206,11 +206,15 @@ fn discover_server(server_dir: &Path, project: &mut DiscoveredProject) -> Result
         return Ok(());
     }
 
-    // Discover API routes
+    // Discover API routes from api/ subdirectory
     let api_dir = server_dir.join("api");
     if api_dir.exists() {
         discover_api_routes(&api_dir, &api_dir, project)?;
     }
+
+    // Also discover .cln files directly in server/ as API/helper files
+    // (excludes subdirectories like models/, middleware/, api/)
+    discover_server_root_files(server_dir, project)?;
 
     // Discover models
     let models_dir = server_dir.join("models");
@@ -222,6 +226,32 @@ fn discover_server(server_dir: &Path, project: &mut DiscoveredProject) -> Result
     let middleware_dir = server_dir.join("middleware");
     if middleware_dir.exists() {
         discover_middleware(&middleware_dir, project)?;
+    }
+
+    Ok(())
+}
+
+/// Discover .cln files directly in the server/ root directory
+/// These are treated as shared server modules (helpers, API handlers, etc.)
+fn discover_server_root_files(server_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
+    for entry in fs::read_dir(server_dir).context("Failed to read server directory")? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Only process files (not subdirectories) that are .cln files
+        if path.is_file() && is_cln_file(&path) {
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            // Add as a lib module so it gets imported
+            project.lib_modules.push(LibModule {
+                name,
+                source_file: path,
+            });
+        }
     }
 
     Ok(())

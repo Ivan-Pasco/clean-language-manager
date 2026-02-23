@@ -5,7 +5,7 @@
 //! - Route registration in start()
 //! - Component imports and registry
 
-use crate::core::discovery::{ApiRoute, Component, DiscoveredProject, PageRoute};
+use crate::core::discovery::{ApiRoute, Component, DiscoveredProject, Layout, PageRoute};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
@@ -28,6 +28,70 @@ pub struct CodegenOptions {
     pub generate_registry: bool,
 }
 
+/// Project configuration parsed from config.cln
+#[derive(Debug)]
+pub struct ProjectConfig {
+    /// Server port (default 3000)
+    pub port: u16,
+    /// Explicit import paths from config
+    pub imports: Vec<String>,
+}
+
+impl Default for ProjectConfig {
+    fn default() -> Self {
+        Self {
+            port: 3000,
+            imports: Vec::new(),
+        }
+    }
+}
+
+/// Parse config.cln for project settings
+pub fn parse_project_config(project_dir: &Path) -> ProjectConfig {
+    let config_path = project_dir.join("config.cln");
+    let mut config = ProjectConfig::default();
+
+    if let Ok(content) = fs::read_to_string(config_path) {
+        let mut in_imports = false;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            // Parse port = NNNN
+            if trimmed.starts_with("port") {
+                if let Some(val) = trimmed.split('=').nth(1) {
+                    if let Ok(p) = val.trim().parse::<u16>() {
+                        config.port = p;
+                    }
+                }
+                continue;
+            }
+
+            // Parse imports: block
+            if trimmed == "imports:" {
+                in_imports = true;
+                continue;
+            }
+
+            if in_imports {
+                if trimmed.is_empty() || (!trimmed.starts_with('"') && !trimmed.starts_with('\'')) {
+                    // End of imports block if non-empty non-string line
+                    if !trimmed.is_empty() {
+                        in_imports = false;
+                    }
+                    continue;
+                }
+                let path = trimmed.trim_matches('"').trim_matches('\'');
+                if !path.is_empty() {
+                    config.imports.push(path.to_string());
+                }
+            }
+        }
+    }
+
+    config
+}
+
 /// Result of code generation
 #[derive(Debug)]
 pub struct GeneratedCode {
@@ -45,11 +109,14 @@ pub fn generate_code(
     project_dir: &Path,
     options: &CodegenOptions,
 ) -> Result<GeneratedCode> {
+    // Parse project config for port, imports, etc.
+    let config = parse_project_config(project_dir);
+
     let mut main_cln = String::new();
     let mut handler_index: usize = 0;
 
-    // Generate imports section
-    main_cln.push_str(&generate_imports(project, project_dir)?);
+    // Generate plugins and import sections
+    main_cln.push_str(&generate_imports(project, project_dir, &config)?);
 
     // Generate model classes
     if !project.models.is_empty() {
@@ -68,23 +135,29 @@ pub fn generate_code(
     }
 
     // Generate start: block BEFORE functions: (compiler requires this order)
-    main_cln.push_str(&generate_start_function(project, options)?);
+    main_cln.push_str(&generate_start_function(project, options, config.port)?);
 
     // Generate functions block with handlers
     main_cln.push_str("\nfunctions:\n");
+
+    // Generate _html_escape helper if any components use {expr} interpolation
+    if !project.components.is_empty() {
+        main_cln.push_str(&generate_html_escape_function());
+    }
 
     // Generate component render functions FIRST (so page handlers can call them)
     for component in &project.components {
         main_cln.push_str(&generate_component_render_function(component, options)?);
     }
 
-    // Page handlers (with component expansion)
+    // Page handlers (with component expansion and layout wrapping)
     for page in &project.pages {
         main_cln.push_str(&generate_page_handler(
             page,
             project_dir,
             handler_index,
             &project.components,
+            &project.layouts,
             options,
         )?);
         handler_index += 1;
@@ -118,6 +191,47 @@ pub fn generate_code(
     })
 }
 
+/// Extract component props from a `props:` block in the source file
+/// Returns a list of (type, name) pairs
+fn extract_component_props(content: &str) -> Vec<(String, String)> {
+    let mut props = Vec::new();
+    let mut in_props = false;
+    let mut props_base_indent = 0;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed == "props:" {
+            in_props = true;
+            props_base_indent = line.len() - line.trim_start().len();
+            continue;
+        }
+
+        if in_props {
+            let current_indent = line.len() - line.trim_start().len();
+
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            // End of props block
+            if current_indent <= props_base_indent {
+                break;
+            }
+
+            // Parse "type name" or "type name = default"
+            let parts: Vec<&str> = trimmed.splitn(3, ' ').collect();
+            if parts.len() >= 2 {
+                let prop_type = parts[0].to_string();
+                let prop_name = parts[1].trim_end_matches('=').trim().to_string();
+                props.push((prop_type, prop_name));
+            }
+        }
+    }
+
+    props
+}
+
 /// Generate a component render function from its source file
 fn generate_component_render_function(
     component: &Component,
@@ -145,14 +259,33 @@ fn generate_component_render_function(
         )
     })?;
 
-    // Extract render function body
-    let render_body = extract_component_render_body(&content)?;
+    // Extract props
+    let props = extract_component_props(&content);
 
-    // Generate function with unique name based on class_name (sanitized for valid identifier)
-    output.push_str(&format!(
-        "\tstring __component_{}_render()\n",
-        sanitize_identifier(&component.class_name)
-    ));
+    // Extract render function body
+    let mut render_body = extract_component_render_body(&content)?;
+
+    // Replace this.prop with prop name for standalone functions
+    for (_prop_type, prop_name) in &props {
+        let this_ref = format!("this.{}", prop_name);
+        render_body = render_body.replace(&this_ref, prop_name);
+    }
+
+    // Generate function signature with props as parameters
+    let sanitized_name = sanitize_identifier(&component.class_name);
+    if props.is_empty() {
+        output.push_str(&format!(
+            "\tstring __component_{}_render()\n",
+            sanitized_name
+        ));
+    } else {
+        let params: Vec<String> = props.iter().map(|(t, n)| format!("{} {}", t, n)).collect();
+        output.push_str(&format!(
+            "\tstring __component_{}_render({})\n",
+            sanitized_name,
+            params.join(", ")
+        ));
+    }
     output.push_str(&indent_code(&render_body, 2));
     output.push_str("\n\n");
 
@@ -349,8 +482,12 @@ fn project_uses_database(project: &DiscoveredProject) -> bool {
     false
 }
 
-/// Generate plugins block
-fn generate_imports(project: &DiscoveredProject, _project_dir: &Path) -> Result<String> {
+/// Generate plugins and import blocks
+fn generate_imports(
+    project: &DiscoveredProject,
+    project_dir: &Path,
+    config: &ProjectConfig,
+) -> Result<String> {
     let mut output = String::new();
     let mut plugins = Vec::new();
 
@@ -376,9 +513,30 @@ fn generate_imports(project: &DiscoveredProject, _project_dir: &Path) -> Result<
         }
     }
 
-    // Add lib module imports
+    // Generate import: block from lib modules and config imports
+    let mut import_paths: Vec<String> = Vec::new();
+
+    // Add lib modules as imports
     for lib in &project.lib_modules {
-        output.push_str(&format!("// lib: {}\n", lib.name));
+        let relative = lib
+            .source_file
+            .strip_prefix(project_dir)
+            .unwrap_or(&lib.source_file);
+        import_paths.push(relative.to_string_lossy().to_string());
+    }
+
+    // Add explicit imports from config.cln
+    for import in &config.imports {
+        if !import_paths.contains(import) {
+            import_paths.push(import.clone());
+        }
+    }
+
+    if !import_paths.is_empty() {
+        output.push_str("\nimport:\n");
+        for path in &import_paths {
+            output.push_str(&format!("\t\"{}\"\n", path));
+        }
     }
 
     if !output.is_empty() {
@@ -388,12 +546,71 @@ fn generate_imports(project: &DiscoveredProject, _project_dir: &Path) -> Result<
     Ok(output)
 }
 
+/// Extract the layout name from a page's `<page layout="X">` directive
+fn extract_page_layout(content: &str) -> Option<String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("<page ") {
+            // Extract layout="..." attribute
+            if let Some(start) = trimmed.find("layout=\"") {
+                let after = &trimmed[start + 8..];
+                if let Some(end) = after.find('"') {
+                    return Some(after[..end].to_string());
+                }
+            }
+            // Also try single quotes
+            if let Some(start) = trimmed.find("layout='") {
+                let after = &trimmed[start + 8..];
+                if let Some(end) = after.find('\'') {
+                    return Some(after[..end].to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Find a layout by name from discovered layouts
+fn find_layout<'a>(layouts: &'a [Layout], name: &str) -> Option<&'a Layout> {
+    layouts.iter().find(|l| l.name == name)
+}
+
+/// Apply layout wrapping: read layout HTML, replace <slot></slot> with page content
+fn apply_layout(
+    layout_path: &Path,
+    page_html_lines: &[&str],
+    components: &[Component],
+) -> Result<String> {
+    let layout_content = fs::read_to_string(layout_path)
+        .with_context(|| format!("Failed to read layout: {}", layout_path.display()))?;
+
+    let layout_lines: Vec<&str> = layout_content.lines().collect();
+    let mut merged = Vec::new();
+
+    for layout_line in &layout_lines {
+        let trimmed = layout_line.trim();
+        if trimmed == "<slot></slot>" || trimmed == "<slot />" || trimmed == "<slot/>" {
+            // Replace slot with page content lines
+            for page_line in page_html_lines {
+                merged.push(*page_line);
+            }
+        } else {
+            merged.push(*layout_line);
+        }
+    }
+
+    // Convert merged HTML to Clean code (handles component tags and {{var}} interpolation)
+    let merged_html = merged.join("\n");
+    convert_html_to_clean(&merged_html, components)
+}
+
 /// Generate a page handler function
 fn generate_page_handler(
     page: &PageRoute,
     project_dir: &Path,
     handler_index: usize,
     components: &[Component],
+    layouts: &[Layout],
     options: &CodegenOptions,
 ) -> Result<String> {
     let mut handler = String::new();
@@ -420,12 +637,68 @@ fn generate_page_handler(
         ));
     }
 
-    // Read and inline the page source (with component expansion)
-    let source = read_page_source(&page.source_file, components)?;
+    // Read page source and check for layout directive
+    let page_content = fs::read_to_string(&page.source_file)
+        .with_context(|| format!("Failed to read page: {}", page.source_file.display()))?;
+
+    let layout_name = extract_page_layout(&page_content);
+
+    let source = if let Some(ref name) = layout_name {
+        if let Some(layout) = find_layout(layouts, name) {
+            // Extract page's HTML lines (without script block, page directive, etc.)
+            let page_html_lines = extract_page_html_lines(&page_content);
+            apply_layout(&layout.source_file, &page_html_lines, components)?
+        } else {
+            // Layout not found — fall back to no layout
+            convert_html_to_clean(&page_content, components)?
+        }
+    } else {
+        convert_html_to_clean(&page_content, components)?
+    };
+
     handler.push_str(&indent_code(&source, 2));
     handler.push('\n');
 
     Ok(handler)
+}
+
+/// Extract the HTML template lines from a page (excluding script block and <page> directive)
+fn extract_page_html_lines(content: &str) -> Vec<&str> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut result = Vec::new();
+    let mut in_script = false;
+
+    for line in &lines {
+        let trimmed = line.trim();
+
+        // Skip script blocks
+        if trimmed.contains("<script type=\"text/clean\">")
+            || trimmed.contains("<script type='text/clean'>")
+        {
+            in_script = true;
+            continue;
+        }
+        if in_script {
+            if trimmed.contains("</script>") {
+                in_script = false;
+            }
+            continue;
+        }
+
+        // Skip <page> directive
+        if trimmed.starts_with("<page ") && trimmed.ends_with('>') {
+            continue;
+        }
+
+        // Skip empty leading lines
+        if result.is_empty() && trimmed.is_empty() {
+            continue;
+        }
+
+        result.push(*line);
+    }
+
+    result
 }
 
 /// Generate an API handler function
@@ -472,6 +745,7 @@ fn generate_api_handler(
 fn generate_start_function(
     project: &DiscoveredProject,
     options: &CodegenOptions,
+    port: u16,
 ) -> Result<String> {
     let mut start = String::new();
 
@@ -506,15 +780,28 @@ fn generate_start_function(
         handler_index += 1;
     }
 
-    // Start HTTP listener on default port
+    // Start HTTP listener on configured port
     let has_routes = !project.pages.is_empty() || !project.api_routes.is_empty();
     if has_routes {
-        start.push_str("\ts = _http_listen(3000)\n");
+        start.push_str(&format!("\ts = _http_listen({})\n", port));
     }
 
     start.push('\n');
 
     Ok(start)
+}
+
+/// Generate an inline _html_escape() function for safe interpolation
+fn generate_html_escape_function() -> String {
+    let mut f = String::new();
+    f.push_str("\tstring _html_escape(string input)\n");
+    f.push_str("\t\tstring result = _str_replace(input, \"&\", \"&amp;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"<\", \"&lt;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \">\", \"&gt;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"\\\"\", \"&quot;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"'\", \"&#39;\")\n");
+    f.push_str("\t\treturn result\n\n");
+    f
 }
 
 /// Generate model import/include
@@ -601,6 +888,7 @@ fn extract_route_params(path: &str) -> Vec<String> {
 }
 
 /// Read page source file and convert HTML to Clean Language
+#[allow(dead_code)]
 fn read_page_source(source_file: &Path, components: &[Component]) -> Result<String> {
     let content = fs::read_to_string(source_file)
         .with_context(|| format!("Failed to read page file: {}", source_file.display()))?;
@@ -967,5 +1255,110 @@ mod tests {
         // {{expr}} should still work (legacy syntax)
         let result = escape_html_line("<span>{{name}}</span>");
         assert_eq!(result, "<span>\" + name + \"</span>");
+    }
+
+    #[test]
+    fn test_extract_component_props() {
+        let src = r#"component ModuleCard
+    props:
+        string id
+        string title
+        string difficulty
+    html:
+        <article>{this.title}</article>
+"#;
+        let props = extract_component_props(src);
+        assert_eq!(props.len(), 3);
+        assert_eq!(props[0], ("string".to_string(), "id".to_string()));
+        assert_eq!(props[1], ("string".to_string(), "title".to_string()));
+        assert_eq!(props[2], ("string".to_string(), "difficulty".to_string()));
+    }
+
+    #[test]
+    fn test_extract_component_props_empty() {
+        let src = r#"component Hero
+    html:
+        <section>Hello</section>
+"#;
+        let props = extract_component_props(src);
+        assert!(props.is_empty());
+    }
+
+    #[test]
+    fn test_this_prop_replaced_in_render_body() {
+        // Bug 10: this.prop should be replaced with prop name
+        let src = r#"component Card
+    props:
+        string title
+        string desc
+    html:
+        <h3>{this.title}</h3>
+        <p>{this.desc}</p>
+"#;
+        let mut body = extract_component_render_body(src).unwrap();
+        let props = extract_component_props(src);
+        for (_t, name) in &props {
+            body = body.replace(&format!("this.{}", name), name);
+        }
+        assert!(!body.contains("this.title"));
+        assert!(!body.contains("this.desc"));
+        assert!(body.contains("_html_escape(title)"));
+        assert!(body.contains("_html_escape(desc)"));
+    }
+
+    #[test]
+    fn test_extract_page_layout() {
+        assert_eq!(
+            extract_page_layout("<page layout=\"main\"></page>\n<main>Hi</main>"),
+            Some("main".to_string())
+        );
+        assert_eq!(
+            extract_page_layout("<page layout='admin'></page>\n<div>X</div>"),
+            Some("admin".to_string())
+        );
+        assert_eq!(extract_page_layout("<main>Hi</main>"), None);
+    }
+
+    #[test]
+    fn test_parse_project_config_port() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_config_port");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut f = std::fs::File::create(dir.join("config.cln")).unwrap();
+        writeln!(f, "config:").unwrap();
+        writeln!(f, "\tserver:").unwrap();
+        writeln!(f, "\t\tport = 3001").unwrap();
+        let config = parse_project_config(&dir);
+        assert_eq!(config.port, 3001);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_parse_project_config_imports() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_config_imports");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut f = std::fs::File::create(dir.join("config.cln")).unwrap();
+        writeln!(f, "config:").unwrap();
+        writeln!(f, "\timports:").unwrap();
+        writeln!(f, "\t\t\"app/server/helpers.cln\"").unwrap();
+        writeln!(f, "\t\t\"app/server/utils.cln\"").unwrap();
+        let config = parse_project_config(&dir);
+        assert_eq!(config.imports.len(), 2);
+        assert_eq!(config.imports[0], "app/server/helpers.cln");
+        assert_eq!(config.imports[1], "app/server/utils.cln");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_html_escape_function_generated() {
+        let func = generate_html_escape_function();
+        assert!(func.contains("string _html_escape(string input)"));
+        assert!(func.contains("_str_replace"));
+        assert!(func.contains("&amp;"));
+        assert!(func.contains("&lt;"));
+        assert!(func.contains("&gt;"));
     }
 }
