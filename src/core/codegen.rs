@@ -1112,14 +1112,15 @@ fn generate_start_function(
 
 /// Generate an inline __safe_html_escape() function for safe interpolation.
 /// Uses a __ prefix to avoid conflicts with plugin-declared _html_escape.
+/// Uses .replace() instance method (compiles to string_replace WASM import).
 fn generate_safe_html_escape_function() -> String {
     let mut f = String::new();
     f.push_str("\tstring __safe_html_escape(string input)\n");
-    f.push_str("\t\tstring result = _str_replace(input, \"&\", \"&amp;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"<\", \"&lt;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \">\", \"&gt;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"\\\"\", \"&quot;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"'\", \"&#39;\")\n");
+    f.push_str("\t\tstring result = input.replace(\"&\", \"&amp;\")\n");
+    f.push_str("\t\tresult = result.replace(\"<\", \"&lt;\")\n");
+    f.push_str("\t\tresult = result.replace(\">\", \"&gt;\")\n");
+    f.push_str("\t\tresult = result.replace(\"\\\"\", \"&quot;\")\n");
+    f.push_str("\t\tresult = result.replace(\"'\", \"&#39;\")\n");
     f.push_str("\t\treturn result\n\n");
     f
 }
