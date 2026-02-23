@@ -267,6 +267,126 @@ fn extract_component_props(content: &str) -> Vec<(String, String)> {
     props
 }
 
+/// Extract helper functions defined in a component file (after the html: block)
+///
+/// Helper functions are top-level function definitions within the component: block
+/// that are not part of `props:` or `html:`. They start with a type keyword followed
+/// by a function name and parentheses, e.g. `string getDifficultyClass(string level)`.
+fn extract_component_helpers(content: &str) -> Vec<String> {
+    let mut helpers = Vec::new();
+    let mut in_component = false;
+    let mut component_indent = 0;
+    let mut in_props = false;
+    let mut in_html = false;
+    let mut section_indent = 0;
+    let mut current_helper = String::new();
+    let mut helper_indent = 0;
+
+    let type_keywords = ["string", "integer", "number", "boolean", "void"];
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let indent = line.len() - line.trim_start().len();
+
+        // Detect component: block start
+        if trimmed.starts_with("component:") {
+            in_component = true;
+            component_indent = indent;
+            continue;
+        }
+
+        if !in_component {
+            continue;
+        }
+
+        // A line at component_indent or less (non-empty) ends the component block
+        if !trimmed.is_empty() && indent <= component_indent && !trimmed.starts_with("component:") {
+            // Flush any in-progress helper
+            if !current_helper.is_empty() {
+                helpers.push(current_helper.trim_end().to_string());
+                current_helper.clear();
+            }
+            break;
+        }
+
+        // Detect section starts (props:, html:)
+        if trimmed == "props:" {
+            if !current_helper.is_empty() {
+                helpers.push(current_helper.trim_end().to_string());
+                current_helper.clear();
+            }
+            in_props = true;
+            in_html = false;
+            section_indent = indent;
+            continue;
+        }
+        if trimmed == "html:" {
+            if !current_helper.is_empty() {
+                helpers.push(current_helper.trim_end().to_string());
+                current_helper.clear();
+            }
+            in_html = true;
+            in_props = false;
+            section_indent = indent;
+            continue;
+        }
+
+        if trimmed.is_empty() {
+            if !current_helper.is_empty() {
+                current_helper.push('\n');
+            }
+            continue;
+        }
+
+        // Skip lines inside props: or html: blocks
+        if in_props && indent > section_indent {
+            continue;
+        }
+        if in_html && indent > section_indent {
+            continue;
+        }
+
+        // If we're here, we've left the props:/html: section
+        if in_props && indent <= section_indent {
+            in_props = false;
+        }
+        if in_html && indent <= section_indent {
+            in_html = false;
+        }
+
+        // Check if this is a new function definition at component member level
+        let is_func_def = type_keywords
+            .iter()
+            .any(|kw| trimmed.starts_with(&format!("{} ", kw)) && trimmed.contains('('));
+
+        if is_func_def {
+            // Flush previous helper if any
+            if !current_helper.is_empty() {
+                helpers.push(current_helper.trim_end().to_string());
+                current_helper.clear();
+            }
+            helper_indent = indent;
+            current_helper.push_str(trimmed);
+            current_helper.push('\n');
+        } else if !current_helper.is_empty() && indent > helper_indent {
+            // Continuation of current helper function body
+            current_helper.push_str(trimmed);
+            current_helper.push('\n');
+        } else if !current_helper.is_empty() {
+            // Indentation dropped — flush the helper
+            helpers.push(current_helper.trim_end().to_string());
+            current_helper.clear();
+        }
+    }
+
+    // Flush final helper
+    if !current_helper.is_empty() {
+        helpers.push(current_helper.trim_end().to_string());
+    }
+
+    helpers
+}
+
 /// Generate a component render function from its source file
 fn generate_component_render_function(
     component: &Component,
@@ -296,6 +416,19 @@ fn generate_component_render_function(
 
     // Extract props
     let props = extract_component_props(&content);
+
+    // Extract and emit helper functions BEFORE the render function
+    let helpers = extract_component_helpers(&content);
+    for helper in &helpers {
+        // Replace this.prop references in helpers too
+        let mut helper_code = helper.clone();
+        for (_prop_type, prop_name) in &props {
+            let this_ref = format!("this.{}", prop_name);
+            helper_code = helper_code.replace(&this_ref, prop_name);
+        }
+        output.push_str(&indent_code(&helper_code, 1));
+        output.push_str("\n\n");
+    }
 
     // Extract render function body
     let mut render_body = extract_component_render_body(&content)?;
@@ -1736,5 +1869,78 @@ mod tests {
             "Should use configured port: {}",
             result
         );
+    }
+
+    #[test]
+    fn test_extract_component_helpers() {
+        let content = r#"component: tag="module-card"
+
+	props:
+		integer id
+		string title
+		string difficulty
+
+	html:
+		<article class="module-card">
+			<span class="badge {!getDifficultyClass(this.difficulty)}">{this.difficulty}</span>
+		</article>
+
+	string getDifficultyClass(string level)
+		integer idx = 0
+		idx = level.indexOf("beginner")
+		if idx == 0
+			return "badge-green"
+		return "badge-default"
+"#;
+        let helpers = extract_component_helpers(content);
+        assert_eq!(helpers.len(), 1, "Expected 1 helper, got: {:?}", helpers);
+        assert!(
+            helpers[0].contains("getDifficultyClass"),
+            "Helper should contain function name: {}",
+            helpers[0]
+        );
+        assert!(
+            helpers[0].contains("badge-green"),
+            "Helper should contain function body: {}",
+            helpers[0]
+        );
+    }
+
+    #[test]
+    fn test_extract_component_helpers_multiple() {
+        let content = r#"component: tag="test-card"
+
+	props:
+		string title
+		string icon
+
+	html:
+		<div>{!getIcon(this.icon)}</div>
+		<h3>{this.title}</h3>
+
+	string getIcon(string iconName)
+		return "<svg></svg>"
+
+	string formatTitle(string raw)
+		return raw
+"#;
+        let helpers = extract_component_helpers(content);
+        assert_eq!(helpers.len(), 2, "Expected 2 helpers, got: {:?}", helpers);
+        assert!(helpers[0].contains("getIcon"));
+        assert!(helpers[1].contains("formatTitle"));
+    }
+
+    #[test]
+    fn test_extract_component_helpers_none() {
+        let content = r#"component: tag="simple"
+
+	props:
+		string title
+
+	html:
+		<div>{this.title}</div>
+"#;
+        let helpers = extract_component_helpers(content);
+        assert!(helpers.is_empty(), "Expected no helpers, got: {:?}", helpers);
     }
 }
