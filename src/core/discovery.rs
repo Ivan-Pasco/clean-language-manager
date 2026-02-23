@@ -212,9 +212,8 @@ fn discover_server(server_dir: &Path, project: &mut DiscoveredProject) -> Result
         discover_api_routes(&api_dir, &api_dir, project)?;
     }
 
-    // Also discover .cln files directly in server/ as API/helper files
-    // (excludes subdirectories like models/, middleware/, api/)
-    discover_server_root_files(server_dir, project)?;
+    // Server root files (main.cln, helpers.cln, etc.) are NOT auto-discovered.
+    // Use explicit imports/routes in config.cln instead (Bug 19 fix).
 
     // Discover models
     let models_dir = server_dir.join("models");
@@ -231,8 +230,32 @@ fn discover_server(server_dir: &Path, project: &mut DiscoveredProject) -> Result
     Ok(())
 }
 
+/// Extract the component tag from a `component: tag="..."` declaration in source
+fn extract_component_tag(content: &str) -> Option<String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("component:") {
+            // Look for tag="..." or tag='...'
+            if let Some(start) = trimmed.find("tag=\"") {
+                let after = &trimmed[start + 5..];
+                if let Some(end) = after.find('"') {
+                    return Some(after[..end].to_string());
+                }
+            }
+            if let Some(start) = trimmed.find("tag='") {
+                let after = &trimmed[start + 5..];
+                if let Some(end) = after.find('\'') {
+                    return Some(after[..end].to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Discover .cln files directly in the server/ root directory
 /// These are treated as shared server modules (helpers, API handlers, etc.)
+#[allow(dead_code)]
 fn discover_server_root_files(server_dir: &Path, project: &mut DiscoveredProject) -> Result<()> {
     for entry in fs::read_dir(server_dir).context("Failed to read server directory")? {
         let entry = entry?;
@@ -325,7 +348,12 @@ fn discover_components(
                 .unwrap_or("Unknown")
                 .to_string();
 
-            let tag = class_name_to_tag(&class_name);
+            // Read component source to extract declared tag (component: tag="...")
+            let tag = if let Ok(content) = fs::read_to_string(&path) {
+                extract_component_tag(&content).unwrap_or_else(|| class_name_to_tag(&class_name))
+            } else {
+                class_name_to_tag(&class_name)
+            };
 
             project.components.push(Component {
                 tag,
@@ -694,5 +722,24 @@ mod tests {
         assert_eq!(convert_params("/blog/[slug]"), "/blog/:slug");
         assert_eq!(convert_params("/users/[id]/posts"), "/users/:id/posts");
         assert_eq!(convert_params("/api/articles/[id]"), "/api/articles/:id");
+    }
+
+    #[test]
+    fn test_extract_component_tag() {
+        // Double-quoted tag
+        let src =
+            "plugins:\n\tframe.ui\n\ncomponent: tag=\"site-navbar\"\n\n\thtml:\n\t\t<nav>...</nav>";
+        assert_eq!(extract_component_tag(src), Some("site-navbar".to_string()));
+
+        // Single-quoted tag
+        let src2 = "component: tag='hero-section'\n\n\thtml:\n\t\t<section>...</section>";
+        assert_eq!(
+            extract_component_tag(src2),
+            Some("hero-section".to_string())
+        );
+
+        // No component: tag declaration → fallback to class_name_to_tag
+        let src3 = "component Hero\n\thtml:\n\t\t<section>...</section>";
+        assert_eq!(extract_component_tag(src3), None);
     }
 }

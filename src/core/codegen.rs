@@ -33,8 +33,10 @@ pub struct CodegenOptions {
 pub struct ProjectConfig {
     /// Server port (default 3000)
     pub port: u16,
-    /// Explicit import paths from config
+    /// Explicit import paths from config (imported, no route extraction)
     pub imports: Vec<String>,
+    /// Route file paths from config (imported AND route registrations extracted)
+    pub routes: Vec<String>,
 }
 
 impl Default for ProjectConfig {
@@ -42,6 +44,7 @@ impl Default for ProjectConfig {
         Self {
             port: 3000,
             imports: Vec::new(),
+            routes: Vec::new(),
         }
     }
 }
@@ -53,6 +56,7 @@ pub fn parse_project_config(project_dir: &Path) -> ProjectConfig {
 
     if let Ok(content) = fs::read_to_string(config_path) {
         let mut in_imports = false;
+        let mut in_routes = false;
 
         for line in content.lines() {
             let trimmed = line.trim();
@@ -64,26 +68,50 @@ pub fn parse_project_config(project_dir: &Path) -> ProjectConfig {
                         config.port = p;
                     }
                 }
+                in_imports = false;
+                in_routes = false;
                 continue;
             }
 
             // Parse imports: block
             if trimmed == "imports:" {
                 in_imports = true;
+                in_routes = false;
+                continue;
+            }
+
+            // Parse routes: block
+            if trimmed == "routes:" {
+                in_routes = true;
+                in_imports = false;
                 continue;
             }
 
             if in_imports {
-                if trimmed.is_empty() || (!trimmed.starts_with('"') && !trimmed.starts_with('\'')) {
-                    // End of imports block if non-empty non-string line
-                    if !trimmed.is_empty() {
-                        in_imports = false;
-                    }
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if !trimmed.starts_with('"') && !trimmed.starts_with('\'') {
+                    in_imports = false;
                     continue;
                 }
                 let path = trimmed.trim_matches('"').trim_matches('\'');
                 if !path.is_empty() {
                     config.imports.push(path.to_string());
+                }
+            }
+
+            if in_routes {
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if !trimmed.starts_with('"') && !trimmed.starts_with('\'') {
+                    in_routes = false;
+                    continue;
+                }
+                let path = trimmed.trim_matches('"').trim_matches('\'');
+                if !path.is_empty() {
+                    config.routes.push(path.to_string());
                 }
             }
         }
@@ -109,11 +137,14 @@ pub fn generate_code(
     project_dir: &Path,
     options: &CodegenOptions,
 ) -> Result<GeneratedCode> {
-    // Parse project config for port, imports, etc.
+    // Parse project config for port, imports, routes, etc.
     let config = parse_project_config(project_dir);
 
+    // Scan route files for handler indices and route registrations
+    let (handler_offset, imported_route_lines) = scan_route_files(&config.routes, project_dir);
+    let mut handler_index: usize = handler_offset;
+
     let mut main_cln = String::new();
-    let mut handler_index: usize = 0;
 
     // Generate plugins and import sections
     main_cln.push_str(&generate_imports(project, project_dir, &config)?);
@@ -135,7 +166,13 @@ pub fn generate_code(
     }
 
     // Generate start: block BEFORE functions: (compiler requires this order)
-    main_cln.push_str(&generate_start_function(project, options, config.port)?);
+    main_cln.push_str(&generate_start_function(
+        project,
+        options,
+        config.port,
+        handler_offset,
+        &imported_route_lines,
+    )?);
 
     // Generate functions block with handlers
     main_cln.push_str("\nfunctions:\n");
@@ -450,8 +487,95 @@ fn escape_html_line(line: &str) -> String {
     result
 }
 
+/// Extract the data block from a page's <script type="text/clean"> section
+fn extract_page_data_block(content: &str) -> String {
+    let mut data_block = String::new();
+    let mut in_script = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.contains("<script type=\"text/clean\">")
+            || trimmed.contains("<script type='text/clean'>")
+        {
+            in_script = true;
+            continue;
+        }
+        if in_script {
+            if trimmed.contains("</script>") {
+                break;
+            }
+            if !trimmed.starts_with("data:") && !trimmed.is_empty() {
+                data_block.push_str(trimmed);
+                data_block.push('\n');
+            }
+        }
+    }
+
+    data_block
+}
+
+/// Scan route files for _http_route() calls and find max handler index
+/// Returns (next_available_handler_index, vec_of_route_registration_lines)
+fn scan_route_files(routes: &[String], project_dir: &Path) -> (usize, Vec<String>) {
+    let mut max_index: Option<usize> = None;
+    let mut route_lines = Vec::new();
+
+    for route_path in routes {
+        let full_path = project_dir.join(route_path);
+        if let Ok(content) = fs::read_to_string(&full_path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                // Extract _http_route() calls (skip comments)
+                if trimmed.contains("_http_route(") && !trimmed.starts_with("//") {
+                    route_lines.push(trimmed.to_string());
+                    if let Some(idx) = extract_route_handler_index(trimmed) {
+                        max_index = Some(max_index.map_or(idx, |m: usize| m.max(idx)));
+                    }
+                }
+                // Also check __route_handler_N() function definitions
+                if let Some(idx) = extract_handler_def_index(trimmed) {
+                    max_index = Some(max_index.map_or(idx, |m: usize| m.max(idx)));
+                }
+            }
+        }
+    }
+
+    let next_index = max_index.map_or(0, |m| m + 1);
+    (next_index, route_lines)
+}
+
+/// Extract handler index from a _http_route() call
+/// e.g., `s = _http_route("GET", "/api/health", 0)` → Some(0)
+fn extract_route_handler_index(line: &str) -> Option<usize> {
+    if let Some(paren_pos) = line.rfind(')') {
+        let before_paren = &line[..paren_pos];
+        if let Some(comma_pos) = before_paren.rfind(',') {
+            let num_str = before_paren[comma_pos + 1..].trim();
+            return num_str.parse::<usize>().ok();
+        }
+    }
+    None
+}
+
+/// Extract handler index from a __route_handler_N() function definition
+/// e.g., `string __route_handler_5()` → Some(5)
+fn extract_handler_def_index(line: &str) -> Option<usize> {
+    if let Some(start) = line.find("__route_handler_") {
+        let after = &line[start + "__route_handler_".len()..];
+        let num_str: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if !num_str.is_empty() {
+            return num_str.parse::<usize>().ok();
+        }
+    }
+    None
+}
+
 /// Check if any source files in the project use database functions
-fn project_uses_database(project: &DiscoveredProject) -> bool {
+fn project_uses_database(
+    project: &DiscoveredProject,
+    config: &ProjectConfig,
+    project_dir: &Path,
+) -> bool {
     let db_patterns = [
         "_db_query",
         "_db_execute",
@@ -460,16 +584,23 @@ fn project_uses_database(project: &DiscoveredProject) -> bool {
         "_db_delete",
     ];
 
-    // Collect all source files to scan
-    let source_files: Vec<&Path> = project
+    // Collect all source files to scan (discovered + config imports/routes)
+    let discovered_files: Vec<std::path::PathBuf> = project
         .api_routes
         .iter()
-        .map(|r| r.source_file.as_path())
-        .chain(project.pages.iter().map(|p| p.source_file.as_path()))
-        .chain(project.lib_modules.iter().map(|l| l.source_file.as_path()))
+        .map(|r| r.source_file.clone())
+        .chain(project.pages.iter().map(|p| p.source_file.clone()))
+        .chain(project.lib_modules.iter().map(|l| l.source_file.clone()))
         .collect();
 
-    for path in source_files {
+    let config_files: Vec<std::path::PathBuf> = config
+        .imports
+        .iter()
+        .chain(config.routes.iter())
+        .map(|p| project_dir.join(p))
+        .collect();
+
+    for path in discovered_files.iter().chain(config_files.iter()) {
         if let Ok(content) = fs::read_to_string(path) {
             for pattern in &db_patterns {
                 if content.contains(pattern) {
@@ -492,8 +623,10 @@ fn generate_imports(
     let mut plugins = Vec::new();
 
     // Determine which plugins are needed
-    let needs_httpserver = !project.pages.is_empty() || !project.api_routes.is_empty();
-    let needs_data = !project.models.is_empty() || project_uses_database(project);
+    let needs_httpserver =
+        !project.pages.is_empty() || !project.api_routes.is_empty() || !config.routes.is_empty();
+    let needs_data =
+        !project.models.is_empty() || project_uses_database(project, config, project_dir);
     let needs_ui = !project.components.is_empty();
 
     if needs_httpserver {
@@ -513,22 +646,35 @@ fn generate_imports(
         }
     }
 
-    // Generate import: block from lib modules and config imports
+    // Generate import: block from config imports, routes, and shared lib modules
+    // All paths get ../../ prefix since generated file is at dist/.generated/main.cln
     let mut import_paths: Vec<String> = Vec::new();
 
-    // Add lib modules as imports
+    // Add explicit imports from config.cln
+    for import in &config.imports {
+        let prefixed = format!("../../{}", import);
+        if !import_paths.contains(&prefixed) {
+            import_paths.push(prefixed);
+        }
+    }
+
+    // Add route files from config.cln (they also need to be imported)
+    for route in &config.routes {
+        let prefixed = format!("../../{}", route);
+        if !import_paths.contains(&prefixed) {
+            import_paths.push(prefixed);
+        }
+    }
+
+    // Add shared lib modules (auto-discovered from app/shared/lib/)
     for lib in &project.lib_modules {
         let relative = lib
             .source_file
             .strip_prefix(project_dir)
             .unwrap_or(&lib.source_file);
-        import_paths.push(relative.to_string_lossy().to_string());
-    }
-
-    // Add explicit imports from config.cln
-    for import in &config.imports {
-        if !import_paths.contains(import) {
-            import_paths.push(import.clone());
+        let prefixed = format!("../../{}", relative.to_string_lossy());
+        if !import_paths.contains(&prefixed) {
+            import_paths.push(prefixed);
         }
     }
 
@@ -645,9 +791,23 @@ fn generate_page_handler(
 
     let source = if let Some(ref name) = layout_name {
         if let Some(layout) = find_layout(layouts, name) {
+            // Extract data block BEFORE layout merge (Bug 18 fix)
+            let data_block = extract_page_data_block(&page_content);
             // Extract page's HTML lines (without script block, page directive, etc.)
             let page_html_lines = extract_page_html_lines(&page_content);
-            apply_layout(&layout.source_file, &page_html_lines, components)?
+            let layout_code = apply_layout(&layout.source_file, &page_html_lines, components)?;
+            // Prepend data block before HTML assembly
+            let mut code = String::new();
+            if !data_block.is_empty() {
+                for line in data_block.lines() {
+                    if !line.trim().is_empty() {
+                        code.push_str(line);
+                        code.push('\n');
+                    }
+                }
+            }
+            code.push_str(&layout_code);
+            code
         } else {
             // Layout not found — fall back to no layout
             convert_html_to_clean(&page_content, components)?
@@ -746,17 +906,35 @@ fn generate_start_function(
     project: &DiscoveredProject,
     options: &CodegenOptions,
     port: u16,
+    handler_offset: usize,
+    imported_route_lines: &[String],
 ) -> Result<String> {
     let mut start = String::new();
 
     start.push_str("\nstart:\n");
     start.push_str("\tinteger s = 0\n");
 
+    // Include imported route registrations first (from config routes: files)
+    if !imported_route_lines.is_empty() {
+        if options.debug_comments {
+            start.push_str("\n\t// Imported route registrations\n");
+        }
+        for line in imported_route_lines {
+            // Ensure proper formatting with tab indent and s = prefix
+            let trimmed = line.trim();
+            if trimmed.starts_with("s =") || trimmed.starts_with("s=") {
+                start.push_str(&format!("\t{}\n", trimmed));
+            } else if trimmed.contains("_http_route(") {
+                start.push_str(&format!("\ts = {}\n", trimmed));
+            }
+        }
+    }
+
+    let mut handler_index = handler_offset;
+
     if options.debug_comments && !project.pages.is_empty() {
         start.push_str("\n\t// Page routes\n");
     }
-
-    let mut handler_index: usize = 0;
 
     // Register page routes
     for page in &project.pages {
@@ -781,7 +959,9 @@ fn generate_start_function(
     }
 
     // Start HTTP listener on configured port
-    let has_routes = !project.pages.is_empty() || !project.api_routes.is_empty();
+    let has_routes = !project.pages.is_empty()
+        || !project.api_routes.is_empty()
+        || !imported_route_lines.is_empty();
     if has_routes {
         start.push_str(&format!("\ts = _http_listen({})\n", port));
     }
@@ -1035,22 +1215,33 @@ fn escape_html_for_clean_with_calls(html: &str) -> String {
             }
         }
 
-        // Check for end of function call: () + "
+        // Check for end of function call: handle both () and (args) with paren depth
         if in_function_call && c == '(' {
             result.push(c);
-            if chars.peek() == Some(&')') {
-                result.push(chars.next().unwrap()); // )
-                                                    // Look for + "
-                if chars.peek() == Some(&' ') {
-                    result.push(chars.next().unwrap()); // space
-                    if chars.peek() == Some(&'+') {
-                        result.push(chars.next().unwrap()); // +
-                        if chars.peek() == Some(&' ') {
-                            result.push(chars.next().unwrap()); // space
-                            if chars.peek() == Some(&'"') {
-                                result.push(chars.next().unwrap()); // "
-                                in_function_call = false;
-                            }
+            // Consume everything until matching closing paren
+            let mut depth = 1;
+            while depth > 0 {
+                if let Some(nc) = chars.next() {
+                    result.push(nc);
+                    match nc {
+                        '(' => depth += 1,
+                        ')' => depth -= 1,
+                        _ => {}
+                    }
+                } else {
+                    break;
+                }
+            }
+            // After closing paren, look for ` + "`
+            if chars.peek() == Some(&' ') {
+                result.push(chars.next().unwrap()); // space
+                if chars.peek() == Some(&'+') {
+                    result.push(chars.next().unwrap()); // +
+                    if chars.peek() == Some(&' ') {
+                        result.push(chars.next().unwrap()); // space
+                        if chars.peek() == Some(&'"') {
+                            result.push(chars.next().unwrap()); // "
+                            in_function_call = false;
                         }
                     }
                 }
@@ -1360,5 +1551,215 @@ mod tests {
         assert!(func.contains("&amp;"));
         assert!(func.contains("&lt;"));
         assert!(func.contains("&gt;"));
+    }
+
+    #[test]
+    fn test_import_paths_have_prefix() {
+        // Bug 16: Import paths need ../../ prefix for dist/.generated/ location
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_import_prefix");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut f = std::fs::File::create(dir.join("config.cln")).unwrap();
+        writeln!(f, "config:").unwrap();
+        writeln!(f, "\timports:").unwrap();
+        writeln!(f, "\t\t\"app/server/helpers.cln\"").unwrap();
+        writeln!(f, "\troutes:").unwrap();
+        writeln!(f, "\t\t\"app/server/api.cln\"").unwrap();
+
+        let config = parse_project_config(&dir);
+        let project = DiscoveredProject::default();
+        let result = generate_imports(&project, &dir, &config).unwrap();
+        assert!(
+            result.contains("\"../../app/server/helpers.cln\""),
+            "Import should have ../../ prefix: {}",
+            result
+        );
+        assert!(
+            result.contains("\"../../app/server/api.cln\""),
+            "Route import should have ../../ prefix: {}",
+            result
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_parse_project_config_routes() {
+        // Bug 19/20: Config should support routes: section
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_config_routes");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut f = std::fs::File::create(dir.join("config.cln")).unwrap();
+        writeln!(f, "config:").unwrap();
+        writeln!(f, "\timports:").unwrap();
+        writeln!(f, "\t\t\"app/server/helpers.cln\"").unwrap();
+        writeln!(f, "\troutes:").unwrap();
+        writeln!(f, "\t\t\"app/server/api.cln\"").unwrap();
+        writeln!(f, "\t\t\"app/server/errors_api.cln\"").unwrap();
+        writeln!(f, "\t\t\"app/server/errors_pages.cln\"").unwrap();
+
+        let config = parse_project_config(&dir);
+        assert_eq!(config.imports.len(), 1);
+        assert_eq!(config.imports[0], "app/server/helpers.cln");
+        assert_eq!(config.routes.len(), 3);
+        assert_eq!(config.routes[0], "app/server/api.cln");
+        assert_eq!(config.routes[1], "app/server/errors_api.cln");
+        assert_eq!(config.routes[2], "app/server/errors_pages.cln");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_extract_page_data_block() {
+        // Bug 18: Data block should be extracted from page's script tag
+        let page = r#"<page layout="main"></page>
+<main><h1>{{msg}}</h1></main>
+<script type="text/clean">
+    string msg = "Hello"
+    string lang = "en"
+</script>"#;
+        let data = extract_page_data_block(page);
+        assert!(
+            data.contains("string msg = \"Hello\""),
+            "Should extract msg: {}",
+            data
+        );
+        assert!(
+            data.contains("string lang = \"en\""),
+            "Should extract lang: {}",
+            data
+        );
+    }
+
+    #[test]
+    fn test_scan_route_files() {
+        // Bug 20: Should find max handler index and extract route lines
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_scan_routes");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("app/server")).unwrap();
+
+        // Create a fake route file
+        let mut f = std::fs::File::create(dir.join("app/server/api.cln")).unwrap();
+        writeln!(f, "functions:").unwrap();
+        writeln!(f, "\tstring __route_handler_0()").unwrap();
+        writeln!(f, "\t\treturn \"ok\"").unwrap();
+        writeln!(f, "\tstring __route_handler_5()").unwrap();
+        writeln!(f, "\t\treturn \"ok\"").unwrap();
+
+        let routes = vec!["app/server/api.cln".to_string()];
+        let (next_index, _lines) = scan_route_files(&routes, &dir);
+        assert_eq!(next_index, 6, "Next index should be max(5) + 1 = 6");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_scan_route_files_with_http_route_calls() {
+        // Bug 20: Should extract _http_route() lines for start: block
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("cleen_test_scan_route_calls");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("app/server")).unwrap();
+
+        let mut f = std::fs::File::create(dir.join("app/server/api.cln")).unwrap();
+        writeln!(f, "// route defs").unwrap();
+        writeln!(f, "\ts = _http_route(\"GET\", \"/api/health\", 0)").unwrap();
+        writeln!(f, "\ts = _http_route(\"GET\", \"/api/content\", 1)").unwrap();
+        writeln!(f, "\ts = _http_route(\"GET\", \"/api/modules\", 5)").unwrap();
+
+        let routes = vec!["app/server/api.cln".to_string()];
+        let (next_index, lines) = scan_route_files(&routes, &dir);
+        assert_eq!(next_index, 6, "Next index should be max(5) + 1 = 6");
+        assert_eq!(lines.len(), 3, "Should have 3 route lines");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_extract_route_handler_index() {
+        assert_eq!(
+            extract_route_handler_index("s = _http_route(\"GET\", \"/api/health\", 0)"),
+            Some(0)
+        );
+        assert_eq!(
+            extract_route_handler_index("s = _http_route(\"POST\", \"/api/v1/reports\", 13)"),
+            Some(13)
+        );
+        assert_eq!(extract_route_handler_index("// not a route"), None);
+    }
+
+    #[test]
+    fn test_extract_handler_def_index() {
+        assert_eq!(
+            extract_handler_def_index("string __route_handler_0()"),
+            Some(0)
+        );
+        assert_eq!(
+            extract_handler_def_index("\tstring __route_handler_21()"),
+            Some(21)
+        );
+        assert_eq!(extract_handler_def_index("string foo()"), None);
+    }
+
+    #[test]
+    fn test_component_tag_expansion_in_html() {
+        // Bug 17: Component tags should be replaced with function calls
+        let components = vec![Component {
+            tag: "site-navbar".to_string(),
+            class_name: "Navbar".to_string(),
+            source_file: std::path::PathBuf::from("Navbar.cln"),
+            hydration: "off".to_string(),
+        }];
+        let expanded = expand_component_tags("<site-navbar></site-navbar>", &components);
+        assert!(
+            expanded.contains("__component_Navbar_render()"),
+            "Should replace tag with function call: {}",
+            expanded
+        );
+        assert!(
+            !expanded.contains("<site-navbar>"),
+            "Should not contain literal tag: {}",
+            expanded
+        );
+    }
+
+    #[test]
+    fn test_handler_offset_in_start_block() {
+        // Bug 20: Framework handlers should start after imported handler indices
+        let project = DiscoveredProject {
+            pages: vec![PageRoute {
+                method: "GET".to_string(),
+                path: "/test".to_string(),
+                source_file: std::path::PathBuf::from("test.html"),
+                handler_index: 0,
+                layout: None,
+                auth: None,
+                cache: None,
+            }],
+            ..Default::default()
+        };
+        let options = CodegenOptions::default();
+        let imported_lines = vec![
+            "s = _http_route(\"GET\", \"/api/health\", 0)".to_string(),
+            "s = _http_route(\"GET\", \"/api/modules\", 5)".to_string(),
+        ];
+        let result =
+            generate_start_function(&project, &options, 3001, 22, &imported_lines).unwrap();
+        // Framework page route should use index 22
+        assert!(
+            result.contains("_http_route(\"GET\", \"/test\", 22)"),
+            "Handler should start at offset 22: {}",
+            result
+        );
+        // Imported routes should be included
+        assert!(
+            result.contains("_http_route(\"GET\", \"/api/health\", 0)"),
+            "Imported routes should be included: {}",
+            result
+        );
+        assert!(
+            result.contains("_http_listen(3001)"),
+            "Should use configured port: {}",
+            result
+        );
     }
 }
