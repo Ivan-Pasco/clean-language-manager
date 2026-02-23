@@ -242,7 +242,7 @@ fn extract_component_render_body(content: &str) -> Result<String> {
                 output.push_str(&escape_html_line(line));
             } else {
                 output.push_str("\"\n");
-                output.push_str(&format!("html = html + \"{}\"", escape_html_line(line)));
+                output.push_str(&format!("html = html + \"{}", escape_html_line(line)));
             }
         }
 
@@ -256,6 +256,11 @@ fn extract_component_render_body(content: &str) -> Result<String> {
 }
 
 /// Escape a single HTML line for embedding in a Clean string literal
+///
+/// Handles interpolation syntax:
+/// - `{{expr}}` → `" + expr + "` (legacy double-brace)
+/// - `{!expr}` → `" + expr + "` (raw interpolation, no escaping)
+/// - `{expr}` → `" + _html_escape(expr) + "` (safe interpolation)
 fn escape_html_line(line: &str) -> String {
     let mut result = String::new();
     let mut chars = line.chars().peekable();
@@ -266,6 +271,7 @@ fn escape_html_line(line: &str) -> String {
             '\\' => result.push_str("\\\\"),
             '\t' => result.push_str("\\t"),
             '{' if chars.peek() == Some(&'{') => {
+                // Legacy {{expr}} interpolation
                 chars.next();
                 let mut var_name = String::new();
                 while let Some(vc) = chars.next() {
@@ -279,13 +285,68 @@ fn escape_html_line(line: &str) -> String {
                 result.push_str(var_name.trim());
                 result.push_str(" + \"");
             }
-            '{' => result.push_str("\\{"),
+            '{' => {
+                // Single-brace interpolation: {expr} or {!expr}
+                let raw = chars.peek() == Some(&'!');
+                if raw {
+                    chars.next(); // consume '!'
+                }
+                let mut expr = String::new();
+                while let Some(vc) = chars.next() {
+                    if vc == '}' {
+                        break;
+                    }
+                    expr.push(vc);
+                }
+                let expr = expr.trim();
+                if raw {
+                    result.push_str("\" + ");
+                    result.push_str(expr);
+                    result.push_str(" + \"");
+                } else {
+                    result.push_str("\" + _html_escape(");
+                    result.push_str(expr);
+                    result.push_str(") + \"");
+                }
+            }
             '}' => result.push_str("\\}"),
             _ => result.push(c),
         }
     }
 
     result
+}
+
+/// Check if any source files in the project use database functions
+fn project_uses_database(project: &DiscoveredProject) -> bool {
+    let db_patterns = [
+        "_db_query",
+        "_db_execute",
+        "_db_insert",
+        "_db_update",
+        "_db_delete",
+    ];
+
+    // Collect all source files to scan
+    let source_files: Vec<&Path> = project
+        .api_routes
+        .iter()
+        .map(|r| r.source_file.as_path())
+        .chain(project.pages.iter().map(|p| p.source_file.as_path()))
+        .chain(project.lib_modules.iter().map(|l| l.source_file.as_path()))
+        .collect();
+
+    for path in source_files {
+        if let Ok(content) = fs::read_to_string(path) {
+            for pattern in &db_patterns {
+                if content.contains(pattern) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Generate plugins block
@@ -295,7 +356,7 @@ fn generate_imports(project: &DiscoveredProject, _project_dir: &Path) -> Result<
 
     // Determine which plugins are needed
     let needs_httpserver = !project.pages.is_empty() || !project.api_routes.is_empty();
-    let needs_data = !project.models.is_empty();
+    let needs_data = !project.models.is_empty() || project_uses_database(project);
     let needs_ui = !project.components.is_empty();
 
     if needs_httpserver {
@@ -842,5 +903,75 @@ mod tests {
         let code = "line1\nline2\nline3";
         let indented = indent_code(code, 2);
         assert_eq!(indented, "\t\tline1\n\t\tline2\n\t\tline3");
+    }
+
+    #[test]
+    fn test_component_render_no_double_quotes() {
+        // Bug 7: html: block conversion should not produce trailing ""
+        let component_src = r#"component Hero
+    html:
+        <section class="hero">
+        <div class="container">
+        <h1>Hello</h1>
+        </div>
+        </section>
+"#;
+        let body = extract_component_render_body(component_src).unwrap();
+        // No line should end with "" (double closing quotes)
+        for line in body.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("html = html + ") {
+                assert!(
+                    !trimmed.ends_with("\"\""),
+                    "Line has trailing double quotes: {}",
+                    trimmed
+                );
+            }
+        }
+        // Each concatenation line should end with exactly one "
+        for line in body.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("html = html + \"") {
+                assert!(
+                    trimmed.ends_with('"'),
+                    "Line should end with single quote: {}",
+                    trimmed
+                );
+                // Count trailing quotes
+                let trailing_quotes = trimmed.chars().rev().take_while(|c| *c == '"').count();
+                assert_eq!(
+                    trailing_quotes, 1,
+                    "Expected 1 trailing quote, got {} in: {}",
+                    trailing_quotes, trimmed
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_interpolation_safe_escape() {
+        // Bug 9: {expr} should expand to _html_escape(expr)
+        let result = escape_html_line("<h3>{this.title}</h3>");
+        assert_eq!(
+            result,
+            "<h3>\" + _html_escape(this.title) + \"</h3>"
+        );
+    }
+
+    #[test]
+    fn test_interpolation_raw() {
+        // Bug 9: {!expr} should expand to raw expr (no escaping)
+        let result = escape_html_line("<div>{!getIcon(this.icon)}</div>");
+        assert_eq!(
+            result,
+            "<div>\" + getIcon(this.icon) + \"</div>"
+        );
+    }
+
+    #[test]
+    fn test_interpolation_legacy_double_brace() {
+        // {{expr}} should still work (legacy syntax)
+        let result = escape_html_line("<span>{{name}}</span>");
+        assert_eq!(result, "<span>\" + name + \"</span>");
     }
 }
