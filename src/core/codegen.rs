@@ -1941,6 +1941,10 @@ mod tests {
 		<div>{this.title}</div>
 "#;
         let helpers = extract_component_helpers(content);
-        assert!(helpers.is_empty(), "Expected no helpers, got: {:?}", helpers);
+        assert!(
+            helpers.is_empty(),
+            "Expected no helpers, got: {:?}",
+            helpers
+        );
     }
 }
