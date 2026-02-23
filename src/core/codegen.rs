@@ -177,10 +177,8 @@ pub fn generate_code(
     // Generate functions block with handlers
     main_cln.push_str("\nfunctions:\n");
 
-    // Generate _html_escape helper if any components use {expr} interpolation
-    if !project.components.is_empty() {
-        main_cln.push_str(&generate_html_escape_function());
-    }
+    // _html_escape is provided by the frame.ui plugin (which is always present when
+    // components exist), so we do NOT inline it here to avoid duplicate definitions.
 
     // Generate component render functions FIRST (so page handlers can call them)
     for component in &project.components {
@@ -971,19 +969,6 @@ fn generate_start_function(
     Ok(start)
 }
 
-/// Generate an inline _html_escape() function for safe interpolation
-fn generate_html_escape_function() -> String {
-    let mut f = String::new();
-    f.push_str("\tstring _html_escape(string input)\n");
-    f.push_str("\t\tstring result = _str_replace(input, \"&\", \"&amp;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"<\", \"&lt;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \">\", \"&gt;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"\\\"\", \"&quot;\")\n");
-    f.push_str("\t\tresult = _str_replace(result, \"'\", \"&#39;\")\n");
-    f.push_str("\t\treturn result\n\n");
-    f
-}
-
 /// Generate model import/include
 fn generate_model_import(source_file: &Path, project_dir: &Path) -> Result<String> {
     let relative = source_file.strip_prefix(project_dir).unwrap_or(source_file);
@@ -1541,16 +1526,6 @@ mod tests {
         assert_eq!(config.imports[0], "app/server/helpers.cln");
         assert_eq!(config.imports[1], "app/server/utils.cln");
         let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_html_escape_function_generated() {
-        let func = generate_html_escape_function();
-        assert!(func.contains("string _html_escape(string input)"));
-        assert!(func.contains("_str_replace"));
-        assert!(func.contains("&amp;"));
-        assert!(func.contains("&lt;"));
-        assert!(func.contains("&gt;"));
     }
 
     #[test]
