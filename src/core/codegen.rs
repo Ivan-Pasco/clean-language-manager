@@ -177,8 +177,12 @@ pub fn generate_code(
     // Generate functions block with handlers
     main_cln.push_str("\nfunctions:\n");
 
-    // _html_escape is provided by the frame.ui plugin (which is always present when
-    // components exist), so we do NOT inline it here to avoid duplicate definitions.
+    // Inline __safe_html_escape as a Clean function for safe {expr} interpolation.
+    // Named with __ prefix to avoid conflicts with plugin-declared _html_escape
+    // (plugins declare it but don't provide a runtime implementation).
+    if !project.components.is_empty() {
+        main_cln.push_str(&generate_safe_html_escape_function());
+    }
 
     // Generate component render functions FIRST (so page handlers can call them)
     for component in &project.components {
@@ -565,7 +569,7 @@ fn extract_component_render_body(content: &str) -> Result<String> {
 /// Handles interpolation syntax:
 /// - `{{expr}}` → `" + expr + "` (legacy double-brace)
 /// - `{!expr}` → `" + expr + "` (raw interpolation, no escaping)
-/// - `{expr}` → `" + _html_escape(expr) + "` (safe interpolation)
+/// - `{expr}` → `" + __safe_html_escape(expr) + "` (safe interpolation)
 fn escape_html_line(line: &str) -> String {
     let mut result = String::new();
     let mut chars = line.chars().peekable();
@@ -609,7 +613,7 @@ fn escape_html_line(line: &str) -> String {
                     result.push_str(expr);
                     result.push_str(" + \"");
                 } else {
-                    result.push_str("\" + _html_escape(");
+                    result.push_str("\" + __safe_html_escape(");
                     result.push_str(expr);
                     result.push_str(") + \"");
                 }
@@ -1106,6 +1110,20 @@ fn generate_start_function(
     Ok(start)
 }
 
+/// Generate an inline __safe_html_escape() function for safe interpolation.
+/// Uses a __ prefix to avoid conflicts with plugin-declared _html_escape.
+fn generate_safe_html_escape_function() -> String {
+    let mut f = String::new();
+    f.push_str("\tstring __safe_html_escape(string input)\n");
+    f.push_str("\t\tstring result = _str_replace(input, \"&\", \"&amp;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"<\", \"&lt;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \">\", \"&gt;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"\\\"\", \"&quot;\")\n");
+    f.push_str("\t\tresult = _str_replace(result, \"'\", \"&#39;\")\n");
+    f.push_str("\t\treturn result\n\n");
+    f
+}
+
 /// Generate model import/include
 fn generate_model_import(source_file: &Path, project_dir: &Path) -> Result<String> {
     let relative = source_file.strip_prefix(project_dir).unwrap_or(source_file);
@@ -1551,9 +1569,9 @@ mod tests {
 
     #[test]
     fn test_interpolation_safe_escape() {
-        // Bug 9: {expr} should expand to _html_escape(expr)
+        // Bug 9: {expr} should expand to __safe_html_escape(expr)
         let result = escape_html_line("<h3>{this.title}</h3>");
-        assert_eq!(result, "<h3>\" + _html_escape(this.title) + \"</h3>");
+        assert_eq!(result, "<h3>\" + __safe_html_escape(this.title) + \"</h3>");
     }
 
     #[test]
@@ -1615,8 +1633,8 @@ mod tests {
         }
         assert!(!body.contains("this.title"));
         assert!(!body.contains("this.desc"));
-        assert!(body.contains("_html_escape(title)"));
-        assert!(body.contains("_html_escape(desc)"));
+        assert!(body.contains("__safe_html_escape(title)"));
+        assert!(body.contains("__safe_html_escape(desc)"));
     }
 
     #[test]
