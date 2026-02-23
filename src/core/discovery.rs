@@ -460,10 +460,10 @@ fn is_cln_file(path: &Path) -> bool {
     path.extension().map(|ext| ext == "cln").unwrap_or(false)
 }
 
-/// Check if file is a page file (.html.cln)
+/// Check if file is a page file (.html.cln or .html)
 fn is_page_file(path: &Path) -> bool {
     path.to_str()
-        .map(|s| s.ends_with(".html.cln"))
+        .map(|s| s.ends_with(".html.cln") || s.ends_with(".html"))
         .unwrap_or(false)
 }
 
@@ -478,8 +478,10 @@ fn file_to_route_path(file_path: &Path, base_dir: &Path) -> String {
 
     let path_str = relative.to_string_lossy();
 
-    // Remove .html.cln extension
-    let path_str = path_str.trim_end_matches(".html.cln");
+    // Remove .html.cln or .html extension
+    let path_str = path_str
+        .trim_end_matches(".html.cln")
+        .trim_end_matches(".html");
 
     // Handle index files
     let path_str = if path_str == "index" || path_str.is_empty() {
@@ -606,6 +608,7 @@ mod tests {
     fn test_file_to_route_path() {
         let base = Path::new("/app/ui/pages");
 
+        // .html.cln extension
         assert_eq!(
             file_to_route_path(Path::new("/app/ui/pages/index.html.cln"), base),
             "/"
@@ -622,6 +625,24 @@ mod tests {
             file_to_route_path(Path::new("/app/ui/pages/blog/[slug].html.cln"), base),
             "/blog/:slug"
         );
+
+        // .html extension
+        assert_eq!(
+            file_to_route_path(Path::new("/app/ui/pages/index.html"), base),
+            "/"
+        );
+        assert_eq!(
+            file_to_route_path(Path::new("/app/ui/pages/about.html"), base),
+            "/about"
+        );
+    }
+
+    #[test]
+    fn test_is_page_file() {
+        assert!(is_page_file(Path::new("test.html.cln")));
+        assert!(is_page_file(Path::new("test.html")));
+        assert!(!is_page_file(Path::new("test.cln")));
+        assert!(!is_page_file(Path::new("test.txt")));
     }
 
     #[test]

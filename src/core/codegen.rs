@@ -67,6 +67,9 @@ pub fn generate_code(
         main_cln.push('\n');
     }
 
+    // Generate start: block BEFORE functions: (compiler requires this order)
+    main_cln.push_str(&generate_start_function(project, options)?);
+
     // Generate functions block with handlers
     main_cln.push_str("\nfunctions:\n");
 
@@ -97,9 +100,6 @@ pub fn generate_code(
         )?);
         handler_index += 1;
     }
-
-    // Generate start() function with route registration
-    main_cln.push_str(&generate_start_function(project, options)?);
 
     // Generate component registry if requested
     let component_registry = if options.generate_registry && !project.components.is_empty() {
@@ -160,7 +160,12 @@ fn generate_component_render_function(
 }
 
 /// Extract the render function body from a component source file
+///
+/// Tries two strategies:
+/// 1. Look for a `string render()` function and extract its body
+/// 2. Look for an `html:` block and convert it to string concatenation
 fn extract_component_render_body(content: &str) -> Result<String> {
+    // Strategy 1: Look for string render() function
     let mut in_render = false;
     let mut render_body = String::new();
     let mut base_indent = 0;
@@ -177,58 +182,149 @@ fn extract_component_render_body(content: &str) -> Result<String> {
         }
 
         if in_render {
-            // Check if we've exited the render function (new function or block at same/lower indent)
             let current_indent = line.len() - line.trim_start().len();
 
-            // Empty lines are okay
             if trimmed.is_empty() {
                 continue;
             }
 
-            // If we hit a line at the same or lower indentation that's not part of render, stop
-            if current_indent <= base_indent && !trimmed.is_empty() {
+            // If we hit a line at the same or lower indentation, stop
+            if current_indent <= base_indent {
                 break;
             }
 
-            // Add the line (removing the extra indentation)
             render_body.push_str(trimmed);
             render_body.push('\n');
         }
     }
 
-    if render_body.is_empty() {
-        // If no render body found, return a placeholder
-        Ok("return \"\"".to_string())
-    } else {
-        Ok(render_body.trim_end().to_string())
+    if !render_body.is_empty() {
+        return Ok(render_body.trim_end().to_string());
     }
+
+    // Strategy 2: Look for html: block and convert to string concatenation
+    let mut in_html = false;
+    let mut html_lines = Vec::new();
+    let mut html_base_indent = 0;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed == "html:" {
+            in_html = true;
+            html_base_indent = line.len() - line.trim_start().len();
+            continue;
+        }
+
+        if in_html {
+            let current_indent = line.len() - line.trim_start().len();
+
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            // If we hit a line at the same or lower indentation, stop
+            if current_indent <= html_base_indent {
+                break;
+            }
+
+            html_lines.push(trimmed.to_string());
+        }
+    }
+
+    if !html_lines.is_empty() {
+        // Convert html: block lines to string concatenation
+        let mut output = String::new();
+        output.push_str("string html = \"");
+
+        for (i, line) in html_lines.iter().enumerate() {
+            if i == 0 {
+                output.push_str(&escape_html_line(line));
+            } else {
+                output.push_str("\"\n");
+                output.push_str(&format!("html = html + \"{}\"", escape_html_line(line)));
+            }
+        }
+
+        output.push_str("\"\n");
+        output.push_str("return html");
+        return Ok(output);
+    }
+
+    // No render body found - return placeholder
+    Ok("return \"\"".to_string())
 }
 
-/// Generate import statements
+/// Escape a single HTML line for embedding in a Clean string literal
+fn escape_html_line(line: &str) -> String {
+    let mut result = String::new();
+    let mut chars = line.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => result.push_str("\\\""),
+            '\\' => result.push_str("\\\\"),
+            '\t' => result.push_str("\\t"),
+            '{' if chars.peek() == Some(&'{') => {
+                chars.next();
+                let mut var_name = String::new();
+                while let Some(vc) = chars.next() {
+                    if vc == '}' && chars.peek() == Some(&'}') {
+                        chars.next();
+                        break;
+                    }
+                    var_name.push(vc);
+                }
+                result.push_str("\" + ");
+                result.push_str(var_name.trim());
+                result.push_str(" + \"");
+            }
+            '{' => result.push_str("\\{"),
+            '}' => result.push_str("\\}"),
+            _ => result.push(c),
+        }
+    }
+
+    result
+}
+
+/// Generate plugins block
 fn generate_imports(project: &DiscoveredProject, _project_dir: &Path) -> Result<String> {
-    let mut imports = String::new();
+    let mut output = String::new();
+    let mut plugins = Vec::new();
 
-    // Check what plugins are needed
-    let needs_web = !project.pages.is_empty() || !project.api_routes.is_empty();
+    // Determine which plugins are needed
+    let needs_httpserver = !project.pages.is_empty() || !project.api_routes.is_empty();
     let needs_data = !project.models.is_empty();
+    let needs_ui = !project.components.is_empty();
 
-    if needs_web {
-        imports.push_str("import frame.web\n");
+    if needs_httpserver {
+        plugins.push("frame.httpserver");
     }
     if needs_data {
-        imports.push_str("import frame.data\n");
+        plugins.push("frame.data");
+    }
+    if needs_ui {
+        plugins.push("frame.ui");
+    }
+
+    if !plugins.is_empty() {
+        output.push_str("plugins:\n");
+        for plugin in &plugins {
+            output.push_str(&format!("\t{}\n", plugin));
+        }
     }
 
     // Add lib module imports
     for lib in &project.lib_modules {
-        imports.push_str(&format!("// lib: {}\n", lib.name));
+        output.push_str(&format!("// lib: {}\n", lib.name));
     }
 
-    if !imports.is_empty() {
-        imports.push('\n');
+    if !output.is_empty() {
+        output.push('\n');
     }
 
-    Ok(imports)
+    Ok(output)
 }
 
 /// Generate a page handler function
@@ -311,15 +407,15 @@ fn generate_api_handler(
     Ok(handler)
 }
 
-/// Generate the start() function with route registration
+/// Generate the start: block with route registration
 fn generate_start_function(
     project: &DiscoveredProject,
     options: &CodegenOptions,
 ) -> Result<String> {
     let mut start = String::new();
 
-    start.push_str("\nstart()\n");
-    start.push_str("\tinteger status = 0\n");
+    start.push_str("\nstart:\n");
+    start.push_str("\tinteger s = 0\n");
 
     if options.debug_comments && !project.pages.is_empty() {
         start.push_str("\n\t// Page routes\n");
@@ -330,7 +426,7 @@ fn generate_start_function(
     // Register page routes
     for page in &project.pages {
         start.push_str(&format!(
-            "\tstatus = _http_route(\"{}\", \"{}\", {})\n",
+            "\ts = _http_route(\"{}\", \"{}\", {})\n",
             page.method, page.path, handler_index
         ));
         handler_index += 1;
@@ -343,10 +439,16 @@ fn generate_start_function(
     // Register API routes
     for api in &project.api_routes {
         start.push_str(&format!(
-            "\tstatus = _http_route(\"{}\", \"{}\", {})\n",
+            "\ts = _http_route(\"{}\", \"{}\", {})\n",
             api.method, api.path, handler_index
         ));
         handler_index += 1;
+    }
+
+    // Start HTTP listener on default port
+    let has_routes = !project.pages.is_empty() || !project.api_routes.is_empty();
+    if has_routes {
+        start.push_str("\ts = _http_listen(3000)\n");
     }
 
     start.push('\n');
@@ -486,11 +588,13 @@ fn convert_html_to_clean(html: &str, components: &[Component]) -> Result<String>
             .collect();
     }
 
-    // Add data loading code first (commented for now - needs proper variable handling)
+    // Add data loading code first (executable, before HTML string building)
     if !data_block.is_empty() {
-        output.push_str("// Data loading:\n");
         for line in data_block.lines() {
-            output.push_str(&format!("// {}\n", line));
+            if !line.trim().is_empty() {
+                output.push_str(line);
+                output.push('\n');
+            }
         }
     }
 
