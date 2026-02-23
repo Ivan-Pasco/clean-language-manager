@@ -292,7 +292,7 @@ fn escape_html_line(line: &str) -> String {
                     chars.next(); // consume '!'
                 }
                 let mut expr = String::new();
-                while let Some(vc) = chars.next() {
+                for vc in chars.by_ref() {
                     if vc == '}' {
                         break;
                     }
