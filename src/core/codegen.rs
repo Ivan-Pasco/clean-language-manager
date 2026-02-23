@@ -28,15 +28,27 @@ pub struct CodegenOptions {
     pub generate_registry: bool,
 }
 
+/// A route definition parsed from config.cln routes: section
+/// Format: METHOD /path = index
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConfigRoute {
+    /// HTTP method (GET, POST, PUT, DELETE, etc.)
+    pub method: String,
+    /// URL path (e.g., "/api/health", "/api/v1/fingerprints/:fp/resolve")
+    pub path: String,
+    /// Handler index (maps to __route_handler_N in imported .cln files)
+    pub index: usize,
+}
+
 /// Project configuration parsed from config.cln
 #[derive(Debug)]
 pub struct ProjectConfig {
     /// Server port (default 3000)
     pub port: u16,
-    /// Explicit import paths from config (imported, no route extraction)
+    /// Explicit import paths from config (imported files)
     pub imports: Vec<String>,
-    /// Route file paths from config (imported AND route registrations extracted)
-    pub routes: Vec<String>,
+    /// Inline route definitions from config (METHOD /path = index)
+    pub routes: Vec<ConfigRoute>,
 }
 
 impl Default for ProjectConfig {
@@ -105,19 +117,59 @@ pub fn parse_project_config(project_dir: &Path) -> ProjectConfig {
                 if trimmed.is_empty() {
                     continue;
                 }
-                if !trimmed.starts_with('"') && !trimmed.starts_with('\'') {
+                // Parse inline route: METHOD /path = index
+                if let Some(route) = parse_config_route_line(trimmed) {
+                    config.routes.push(route);
+                } else if !trimmed.starts_with('"')
+                    && !trimmed.starts_with('\'')
+                    && !trimmed.starts_with("GET")
+                    && !trimmed.starts_with("POST")
+                    && !trimmed.starts_with("PUT")
+                    && !trimmed.starts_with("DELETE")
+                    && !trimmed.starts_with("PATCH")
+                {
                     in_routes = false;
                     continue;
-                }
-                let path = trimmed.trim_matches('"').trim_matches('\'');
-                if !path.is_empty() {
-                    config.routes.push(path.to_string());
                 }
             }
         }
     }
 
     config
+}
+
+/// Parse a single route line from config.cln routes: section
+/// Format: METHOD /path = index
+/// Examples:
+///   GET /api/health = 0
+///   POST /api/v1/reports = 13
+///   POST /api/v1/fingerprints/:fp/resolve = 16
+fn parse_config_route_line(line: &str) -> Option<ConfigRoute> {
+    let trimmed = line.trim();
+
+    // Split on '=' to get index
+    let parts: Vec<&str> = trimmed.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let index: usize = parts[1].trim().parse().ok()?;
+    let left = parts[0].trim();
+
+    // Split left side on first space to get method and path
+    let space_pos = left.find(' ')?;
+    let method = left[..space_pos].trim().to_string();
+    let path = left[space_pos + 1..].trim().to_string();
+
+    if method.is_empty() || path.is_empty() {
+        return None;
+    }
+
+    Some(ConfigRoute {
+        method,
+        path,
+        index,
+    })
 }
 
 /// Result of code generation
@@ -140,8 +192,12 @@ pub fn generate_code(
     // Parse project config for port, imports, routes, etc.
     let config = parse_project_config(project_dir);
 
-    // Scan route files for handler indices and route registrations
-    let (handler_offset, imported_route_lines) = scan_route_files(&config.routes, project_dir);
+    // Calculate handler offset from config routes (max index + 1)
+    let handler_offset = if config.routes.is_empty() {
+        0
+    } else {
+        config.routes.iter().map(|r| r.index).max().unwrap_or(0) + 1
+    };
     let mut handler_index: usize = handler_offset;
 
     let mut main_cln = String::new();
@@ -171,7 +227,7 @@ pub fn generate_code(
         options,
         config.port,
         handler_offset,
-        &imported_route_lines,
+        &config.routes,
     )?);
 
     // Generate functions block with handlers
@@ -653,61 +709,6 @@ fn extract_page_data_block(content: &str) -> String {
     data_block
 }
 
-/// Scan route files for _http_route() calls and find max handler index
-/// Returns (next_available_handler_index, vec_of_route_registration_lines)
-fn scan_route_files(routes: &[String], project_dir: &Path) -> (usize, Vec<String>) {
-    let mut max_index: Option<usize> = None;
-    let mut route_lines = Vec::new();
-
-    for route_path in routes {
-        let full_path = project_dir.join(route_path);
-        if let Ok(content) = fs::read_to_string(&full_path) {
-            for line in content.lines() {
-                let trimmed = line.trim();
-                // Extract _http_route() calls (skip comments)
-                if trimmed.contains("_http_route(") && !trimmed.starts_with("//") {
-                    route_lines.push(trimmed.to_string());
-                    if let Some(idx) = extract_route_handler_index(trimmed) {
-                        max_index = Some(max_index.map_or(idx, |m: usize| m.max(idx)));
-                    }
-                }
-                // Also check __route_handler_N() function definitions
-                if let Some(idx) = extract_handler_def_index(trimmed) {
-                    max_index = Some(max_index.map_or(idx, |m: usize| m.max(idx)));
-                }
-            }
-        }
-    }
-
-    let next_index = max_index.map_or(0, |m| m + 1);
-    (next_index, route_lines)
-}
-
-/// Extract handler index from a _http_route() call
-/// e.g., `s = _http_route("GET", "/api/health", 0)` → Some(0)
-fn extract_route_handler_index(line: &str) -> Option<usize> {
-    if let Some(paren_pos) = line.rfind(')') {
-        let before_paren = &line[..paren_pos];
-        if let Some(comma_pos) = before_paren.rfind(',') {
-            let num_str = before_paren[comma_pos + 1..].trim();
-            return num_str.parse::<usize>().ok();
-        }
-    }
-    None
-}
-
-/// Extract handler index from a __route_handler_N() function definition
-/// e.g., `string __route_handler_5()` → Some(5)
-fn extract_handler_def_index(line: &str) -> Option<usize> {
-    if let Some(start) = line.find("__route_handler_") {
-        let after = &line[start + "__route_handler_".len()..];
-        let num_str: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
-        if !num_str.is_empty() {
-            return num_str.parse::<usize>().ok();
-        }
-    }
-    None
-}
 
 /// Check if any source files in the project use database functions
 fn project_uses_database(
@@ -735,7 +736,6 @@ fn project_uses_database(
     let config_files: Vec<std::path::PathBuf> = config
         .imports
         .iter()
-        .chain(config.routes.iter())
         .map(|p| project_dir.join(p))
         .collect();
 
@@ -763,7 +763,7 @@ fn generate_imports(
 
     // Determine which plugins are needed
     let needs_httpserver =
-        !project.pages.is_empty() || !project.api_routes.is_empty() || !config.routes.is_empty();
+        !project.pages.is_empty() || !project.api_routes.is_empty() || !config.routes.is_empty() || !config.imports.is_empty();
     let needs_data =
         !project.models.is_empty() || project_uses_database(project, config, project_dir);
     let needs_ui = !project.components.is_empty();
@@ -792,14 +792,6 @@ fn generate_imports(
     // Add explicit imports from config.cln
     for import in &config.imports {
         let prefixed = format!("../../{}", import);
-        if !import_paths.contains(&prefixed) {
-            import_paths.push(prefixed);
-        }
-    }
-
-    // Add route files from config.cln (they also need to be imported)
-    for route in &config.routes {
-        let prefixed = format!("../../{}", route);
         if !import_paths.contains(&prefixed) {
             import_paths.push(prefixed);
         }
@@ -1046,26 +1038,23 @@ fn generate_start_function(
     options: &CodegenOptions,
     port: u16,
     handler_offset: usize,
-    imported_route_lines: &[String],
+    config_routes: &[ConfigRoute],
 ) -> Result<String> {
     let mut start = String::new();
 
     start.push_str("\nstart:\n");
     start.push_str("\tinteger s = 0\n");
 
-    // Include imported route registrations first (from config routes: files)
-    if !imported_route_lines.is_empty() {
+    // Include config route registrations first (from config routes: section)
+    if !config_routes.is_empty() {
         if options.debug_comments {
             start.push_str("\n\t// Imported route registrations\n");
         }
-        for line in imported_route_lines {
-            // Ensure proper formatting with tab indent and s = prefix
-            let trimmed = line.trim();
-            if trimmed.starts_with("s =") || trimmed.starts_with("s=") {
-                start.push_str(&format!("\t{}\n", trimmed));
-            } else if trimmed.contains("_http_route(") {
-                start.push_str(&format!("\ts = {}\n", trimmed));
-            }
+        for route in config_routes {
+            start.push_str(&format!(
+                "\ts = _http_route(\"{}\", \"{}\", {})\n",
+                route.method, route.path, route.index
+            ));
         }
     }
 
@@ -1100,7 +1089,7 @@ fn generate_start_function(
     // Start HTTP listener on configured port
     let has_routes = !project.pages.is_empty()
         || !project.api_routes.is_empty()
-        || !imported_route_lines.is_empty();
+        || !config_routes.is_empty();
     if has_routes {
         start.push_str(&format!("\ts = _http_listen({})\n", port));
     }
@@ -1695,7 +1684,6 @@ mod tests {
         writeln!(f, "config:").unwrap();
         writeln!(f, "\timports:").unwrap();
         writeln!(f, "\t\t\"app/server/helpers.cln\"").unwrap();
-        writeln!(f, "\troutes:").unwrap();
         writeln!(f, "\t\t\"app/server/api.cln\"").unwrap();
 
         let config = parse_project_config(&dir);
@@ -1708,7 +1696,7 @@ mod tests {
         );
         assert!(
             result.contains("\"../../app/server/api.cln\""),
-            "Route import should have ../../ prefix: {}",
+            "Import should have ../../ prefix: {}",
             result
         );
         let _ = std::fs::remove_dir_all(&dir);
@@ -1716,7 +1704,7 @@ mod tests {
 
     #[test]
     fn test_parse_project_config_routes() {
-        // Bug 19/20: Config should support routes: section
+        // Routes: section now supports inline METHOD /path = index format
         use std::io::Write;
         let dir = std::env::temp_dir().join("cleen_test_config_routes");
         let _ = std::fs::remove_dir_all(&dir);
@@ -1726,17 +1714,38 @@ mod tests {
         writeln!(f, "\timports:").unwrap();
         writeln!(f, "\t\t\"app/server/helpers.cln\"").unwrap();
         writeln!(f, "\troutes:").unwrap();
-        writeln!(f, "\t\t\"app/server/api.cln\"").unwrap();
-        writeln!(f, "\t\t\"app/server/errors_api.cln\"").unwrap();
-        writeln!(f, "\t\t\"app/server/errors_pages.cln\"").unwrap();
+        writeln!(f, "\t\tGET /api/health = 0").unwrap();
+        writeln!(f, "\t\tGET /api/content = 1").unwrap();
+        writeln!(f, "\t\tPOST /api/v1/reports = 13").unwrap();
 
         let config = parse_project_config(&dir);
         assert_eq!(config.imports.len(), 1);
         assert_eq!(config.imports[0], "app/server/helpers.cln");
         assert_eq!(config.routes.len(), 3);
-        assert_eq!(config.routes[0], "app/server/api.cln");
-        assert_eq!(config.routes[1], "app/server/errors_api.cln");
-        assert_eq!(config.routes[2], "app/server/errors_pages.cln");
+        assert_eq!(
+            config.routes[0],
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/health".to_string(),
+                index: 0
+            }
+        );
+        assert_eq!(
+            config.routes[1],
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/content".to_string(),
+                index: 1
+            }
+        );
+        assert_eq!(
+            config.routes[2],
+            ConfigRoute {
+                method: "POST".to_string(),
+                path: "/api/v1/reports".to_string(),
+                index: 13
+            }
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1763,72 +1772,73 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_route_files() {
-        // Bug 20: Should find max handler index and extract route lines
-        use std::io::Write;
-        let dir = std::env::temp_dir().join("cleen_test_scan_routes");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(dir.join("app/server")).unwrap();
-
-        // Create a fake route file
-        let mut f = std::fs::File::create(dir.join("app/server/api.cln")).unwrap();
-        writeln!(f, "functions:").unwrap();
-        writeln!(f, "\tstring __route_handler_0()").unwrap();
-        writeln!(f, "\t\treturn \"ok\"").unwrap();
-        writeln!(f, "\tstring __route_handler_5()").unwrap();
-        writeln!(f, "\t\treturn \"ok\"").unwrap();
-
-        let routes = vec!["app/server/api.cln".to_string()];
-        let (next_index, _lines) = scan_route_files(&routes, &dir);
-        assert_eq!(next_index, 6, "Next index should be max(5) + 1 = 6");
-        let _ = std::fs::remove_dir_all(&dir);
+    fn test_parse_config_route_line() {
+        // Basic GET route
+        assert_eq!(
+            parse_config_route_line("GET /api/health = 0"),
+            Some(ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/health".to_string(),
+                index: 0
+            })
+        );
+        // POST with nested path
+        assert_eq!(
+            parse_config_route_line("POST /api/v1/reports = 13"),
+            Some(ConfigRoute {
+                method: "POST".to_string(),
+                path: "/api/v1/reports".to_string(),
+                index: 13
+            })
+        );
+        // Route with path parameter
+        assert_eq!(
+            parse_config_route_line("POST /api/v1/fingerprints/:fp/resolve = 16"),
+            Some(ConfigRoute {
+                method: "POST".to_string(),
+                path: "/api/v1/fingerprints/:fp/resolve".to_string(),
+                index: 16
+            })
+        );
+        // Invalid lines
+        assert_eq!(parse_config_route_line("// not a route"), None);
+        assert_eq!(parse_config_route_line("\"app/server/api.cln\""), None);
+        assert_eq!(parse_config_route_line(""), None);
     }
 
     #[test]
-    fn test_scan_route_files_with_http_route_calls() {
-        // Bug 20: Should extract _http_route() lines for start: block
-        use std::io::Write;
-        let dir = std::env::temp_dir().join("cleen_test_scan_route_calls");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(dir.join("app/server")).unwrap();
-
-        let mut f = std::fs::File::create(dir.join("app/server/api.cln")).unwrap();
-        writeln!(f, "// route defs").unwrap();
-        writeln!(f, "\ts = _http_route(\"GET\", \"/api/health\", 0)").unwrap();
-        writeln!(f, "\ts = _http_route(\"GET\", \"/api/content\", 1)").unwrap();
-        writeln!(f, "\ts = _http_route(\"GET\", \"/api/modules\", 5)").unwrap();
-
-        let routes = vec!["app/server/api.cln".to_string()];
-        let (next_index, lines) = scan_route_files(&routes, &dir);
-        assert_eq!(next_index, 6, "Next index should be max(5) + 1 = 6");
-        assert_eq!(lines.len(), 3, "Should have 3 route lines");
-        let _ = std::fs::remove_dir_all(&dir);
+    fn test_config_route_handler_offset() {
+        // Handler offset should be max route index + 1
+        let routes = vec![
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/health".to_string(),
+                index: 0,
+            },
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/modules".to_string(),
+                index: 5,
+            },
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/errors/detail".to_string(),
+                index: 21,
+            },
+        ];
+        let offset = routes.iter().map(|r| r.index).max().unwrap_or(0) + 1;
+        assert_eq!(offset, 22, "Next index should be max(21) + 1 = 22");
     }
 
     #[test]
-    fn test_extract_route_handler_index() {
-        assert_eq!(
-            extract_route_handler_index("s = _http_route(\"GET\", \"/api/health\", 0)"),
-            Some(0)
-        );
-        assert_eq!(
-            extract_route_handler_index("s = _http_route(\"POST\", \"/api/v1/reports\", 13)"),
-            Some(13)
-        );
-        assert_eq!(extract_route_handler_index("// not a route"), None);
-    }
-
-    #[test]
-    fn test_extract_handler_def_index() {
-        assert_eq!(
-            extract_handler_def_index("string __route_handler_0()"),
-            Some(0)
-        );
-        assert_eq!(
-            extract_handler_def_index("\tstring __route_handler_21()"),
-            Some(21)
-        );
-        assert_eq!(extract_handler_def_index("string foo()"), None);
+    fn test_config_route_handler_offset_empty() {
+        let routes: Vec<ConfigRoute> = vec![];
+        let offset = if routes.is_empty() {
+            0
+        } else {
+            routes.iter().map(|r| r.index).max().unwrap_or(0) + 1
+        };
+        assert_eq!(offset, 0, "Empty routes should give offset 0");
     }
 
     #[test]
@@ -1855,7 +1865,7 @@ mod tests {
 
     #[test]
     fn test_handler_offset_in_start_block() {
-        // Bug 20: Framework handlers should start after imported handler indices
+        // Framework handlers should start after imported handler indices
         let project = DiscoveredProject {
             pages: vec![PageRoute {
                 method: "GET".to_string(),
@@ -1869,12 +1879,20 @@ mod tests {
             ..Default::default()
         };
         let options = CodegenOptions::default();
-        let imported_lines = vec![
-            "s = _http_route(\"GET\", \"/api/health\", 0)".to_string(),
-            "s = _http_route(\"GET\", \"/api/modules\", 5)".to_string(),
+        let config_routes = vec![
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/health".to_string(),
+                index: 0,
+            },
+            ConfigRoute {
+                method: "GET".to_string(),
+                path: "/api/modules".to_string(),
+                index: 5,
+            },
         ];
         let result =
-            generate_start_function(&project, &options, 3001, 22, &imported_lines).unwrap();
+            generate_start_function(&project, &options, 3001, 22, &config_routes).unwrap();
         // Framework page route should use index 22
         assert!(
             result.contains("_http_route(\"GET\", \"/test\", 22)"),
