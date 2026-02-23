@@ -366,10 +366,14 @@ fn extract_component_helpers(content: &str) -> Vec<String> {
                 current_helper.clear();
             }
             helper_indent = indent;
+            // Store signature without its base indentation
             current_helper.push_str(trimmed);
             current_helper.push('\n');
         } else if !current_helper.is_empty() && indent > helper_indent {
-            // Continuation of current helper function body
+            // Continuation of current helper function body — preserve relative indentation
+            let relative_indent = indent - helper_indent;
+            let tabs = "\t".repeat(relative_indent);
+            current_helper.push_str(&tabs);
             current_helper.push_str(trimmed);
             current_helper.push('\n');
         } else if !current_helper.is_empty() {
@@ -1903,6 +1907,28 @@ mod tests {
             helpers[0].contains("badge-green"),
             "Helper should contain function body: {}",
             helpers[0]
+        );
+        // Verify relative indentation is preserved:
+        // - signature line has no leading tab (base stripped)
+        // - body lines have 1 tab (relative to signature)
+        // - nested if body has 2 tabs
+        let lines: Vec<&str> = helpers[0].lines().collect();
+        assert!(
+            lines[0].starts_with("string getDifficultyClass"),
+            "Signature should have no leading indent: '{}'",
+            lines[0]
+        );
+        assert!(
+            lines[1].starts_with("\t") && !lines[1].starts_with("\t\t"),
+            "Body should have 1 tab indent: '{}'",
+            lines[1]
+        );
+        // "return badge-green" is inside an if block — should have 2 tabs
+        let return_line = lines.iter().find(|l| l.contains("badge-green")).unwrap();
+        assert!(
+            return_line.starts_with("\t\t"),
+            "Nested if body should have 2 tab indent: '{}'",
+            return_line
         );
     }
 
