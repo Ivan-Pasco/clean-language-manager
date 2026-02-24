@@ -77,32 +77,32 @@ fn generate_main_cln(name: &str) -> String {
 // Returns:
 //   The expanded Clean Language code as a string
 
-expand_block(block_name: string, attributes: string, body: string) -> string
-    // Example: Simply return the body unchanged
-    // In a real plugin, you would parse the attributes and body,
-    // then generate Clean Language code based on them.
+functions:
+	string expand_block(string block_name, string attributes, string body)
+		// Example: Simply return the body unchanged
+		// In a real plugin, you would parse the attributes and body,
+		// then generate Clean Language code based on them.
 
-    // For now, wrap the body in a comment showing it was processed
-    result: string = "// Expanded by {} plugin\n" + body
-    return result
+		// For now, wrap the body in a comment showing it was processed
+		string result = "// Expanded by {} plugin\n" + body
+		return result
 
+	// The validate_block function is called to validate block syntax before expansion.
+	//
+	// Parameters:
+	//   block_name: The name of the block being validated
+	//   attributes: The block attributes as a JSON string
+	//   body: The body content of the block
+	//
+	// Returns:
+	//   true if the block is valid, false otherwise
 
-// The validate_block function is called to validate block syntax before expansion.
-//
-// Parameters:
-//   block_name: The name of the block being validated
-//   attributes: The block attributes as a JSON string
-//   body: The body content of the block
-//
-// Returns:
-//   true if the block is valid, false otherwise
+	boolean validate_block(string block_name, string attributes, string body)
+		// Basic validation - check that we have a valid block name
+		if block_name == ""
+			return false
 
-validate_block(block_name: string, attributes: string, body: string) -> boolean
-    // Basic validation - check that we have a valid block name
-    if block_name == ""
-        return false
-
-    return true
+		return true
 "#,
         name, name
     )
@@ -113,27 +113,25 @@ fn generate_test_cln(name: &str) -> String {
     format!(
         r#"// Test file for {} plugin
 
-// Test that the expand_block function works correctly
-test_expand_basic()
-    block_name: string = "example"
-    attributes: string = "{{}}"
-    body: string = "x: integer = 42"
+functions:
+	// Test that the expand_block function works correctly
+	string test_expand_basic()
+		string block_name = "example"
+		string attributes = "{{}}"
+		string body = "integer x = 42"
 
-    result: string = expand_block(block_name, attributes, body)
+		string result = expand_block(block_name, attributes, body)
+		return result
 
-    // Verify the result contains the original body
-    assert(contains(result, "x: integer = 42"))
+	// Test that validation rejects empty block names
+	boolean test_validate_empty_name()
+		boolean result = validate_block("", "{{}}", "body")
+		return result
 
-
-// Test that validation works correctly
-test_validate_empty_name()
-    result: boolean = validate_block("", "{{}}", "body")
-    assert(result == false)
-
-
-test_validate_valid_block()
-    result: boolean = validate_block("route", "{{}}", "get /users")
-    assert(result == true)
+	// Test that validation accepts valid blocks
+	boolean test_validate_valid_block()
+		boolean result = validate_block("route", "{{}}", "get /users")
+		return result
 "#,
         name
     )
@@ -202,15 +200,17 @@ mod tests {
     fn test_generate_main_cln() {
         let content = generate_main_cln("test-plugin");
         assert!(content.contains("Plugin: test-plugin"));
-        assert!(content.contains("expand_block"));
-        assert!(content.contains("validate_block"));
+        assert!(content.contains("string expand_block(string block_name"));
+        assert!(content.contains("boolean validate_block(string block_name"));
+        assert!(content.contains("string result = "));
     }
 
     #[test]
     fn test_generate_test_cln() {
         let content = generate_test_cln("test-plugin");
         assert!(content.contains("Test file for test-plugin"));
-        assert!(content.contains("test_expand_basic"));
+        assert!(content.contains("string test_expand_basic()"));
+        assert!(content.contains("boolean test_validate_empty_name()"));
     }
 
     #[test]

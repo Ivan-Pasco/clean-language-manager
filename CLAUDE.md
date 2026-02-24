@@ -31,13 +31,59 @@ This is a **fully implemented and functional project**. The codebase is complete
 - Understanding command behavior and expected outputs
 - Troubleshooting and debugging guidance
 
+## Architecture Boundary Rules
+
+**CRITICAL: Read `../system-documents/ARCHITECTURE_BOUNDARIES.md` before implementing ANY new functionality.**
+
+The manager is a **version manager and orchestrator**. It delegates to other binaries — it does NOT reimplement their logic.
+
+### The Manager MUST NOT:
+
+- Parse or understand Clean Language `.cln` syntax
+- Generate Clean Language source code
+- Know about framework folder conventions (`pages/`, `api/`, `data/`, `components/`)
+- Discover/scan project files for routes, components, or models
+- Transform HTML templates or expand component tags
+- Implement any part of the build pipeline (codegen, discovery, compilation)
+- Implement host bridge functions
+
+### The Manager MUST delegate framework operations:
+
+```rust
+// CORRECT — delegate to frame-cli binary
+Command::new("frame-cli").args(["build"]).status()?;
+Command::new("frame-cli").args(["new", name]).status()?;
+Command::new("frame-cli").args(["scan"]).status()?;
+
+// WRONG — implement framework logic directly
+codegen::generate_code(&project);  // DO NOT DO THIS
+discovery::discover_project(&path); // DO NOT DO THIS
+```
+
+### Boundary Violation Check
+
+Before writing ANY new function, ask:
+1. Does this function read/parse/generate `.cln` code? → **STOP — belongs in compiler or frame-cli**
+2. Does this function know about `pages/`, `api/`, `data/` folders? → **STOP — belongs in frame-cli**
+3. Does this function transform HTML or expand templates? → **STOP — belongs in frame-cli**
+4. Does this function implement a `_*` host function? → **STOP — belongs in clean-server**
+
+### Known Violations (Pending Extraction)
+
+The following files contain framework code that must be extracted to `clean-framework/frame-cli/`:
+- `src/core/codegen.rs` (1,491 lines) — entire file is misplaced
+- `src/core/discovery.rs` (745 lines) — entire file is misplaced
+- `src/core/frame.rs` (~663 lines) — `create_project()`, `build_project()`, `scan_project()` and template functions
+
+See: `../system-documents/cross-component-prompts/manager-extract-framework-code.md`
+
 ## Current Implementation
 
 The Clean Language Manager is **fully implemented** with the following architecture:
 
 **Implemented Core Components:**
 - ✅ **Version Management**: Downloads and installs compiler binaries from GitHub releases
-- ✅ **Shim System**: Creates symbolic links to route `cln` commands to active versions  
+- ✅ **Shim System**: Creates symbolic links to route `cln` commands to active versions
 - ✅ **PATH Management**: Automatically configures shell environments
 - ✅ **Storage Structure**: Organizes versions in isolated directories (`~/.cleen/versions/<version>/`)
 

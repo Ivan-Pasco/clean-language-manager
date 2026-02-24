@@ -1,7 +1,5 @@
-pub mod codegen;
 pub mod compatibility;
 pub mod config;
-pub mod discovery;
 pub mod download;
 pub mod frame;
 pub mod github;
