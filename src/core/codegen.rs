@@ -1806,7 +1806,7 @@ mod tests {
     #[test]
     fn test_config_route_handler_offset() {
         // Handler offset should be max route index + 1
-        let routes = vec![
+        let routes = [
             ConfigRoute {
                 method: "GET".to_string(),
                 path: "/api/health".to_string(),
