@@ -709,7 +709,6 @@ fn extract_page_data_block(content: &str) -> String {
     data_block
 }
 
-
 /// Check if any source files in the project use database functions
 fn project_uses_database(
     project: &DiscoveredProject,
@@ -733,11 +732,8 @@ fn project_uses_database(
         .chain(project.lib_modules.iter().map(|l| l.source_file.clone()))
         .collect();
 
-    let config_files: Vec<std::path::PathBuf> = config
-        .imports
-        .iter()
-        .map(|p| project_dir.join(p))
-        .collect();
+    let config_files: Vec<std::path::PathBuf> =
+        config.imports.iter().map(|p| project_dir.join(p)).collect();
 
     for path in discovered_files.iter().chain(config_files.iter()) {
         if let Ok(content) = fs::read_to_string(path) {
@@ -762,8 +758,10 @@ fn generate_imports(
     let mut plugins = Vec::new();
 
     // Determine which plugins are needed
-    let needs_httpserver =
-        !project.pages.is_empty() || !project.api_routes.is_empty() || !config.routes.is_empty() || !config.imports.is_empty();
+    let needs_httpserver = !project.pages.is_empty()
+        || !project.api_routes.is_empty()
+        || !config.routes.is_empty()
+        || !config.imports.is_empty();
     let needs_data =
         !project.models.is_empty() || project_uses_database(project, config, project_dir);
     let needs_ui = !project.components.is_empty();
@@ -1087,9 +1085,8 @@ fn generate_start_function(
     }
 
     // Start HTTP listener on configured port
-    let has_routes = !project.pages.is_empty()
-        || !project.api_routes.is_empty()
-        || !config_routes.is_empty();
+    let has_routes =
+        !project.pages.is_empty() || !project.api_routes.is_empty() || !config_routes.is_empty();
     if has_routes {
         start.push_str(&format!("\ts = _http_listen({})\n", port));
     }
@@ -1891,8 +1888,7 @@ mod tests {
                 index: 5,
             },
         ];
-        let result =
-            generate_start_function(&project, &options, 3001, 22, &config_routes).unwrap();
+        let result = generate_start_function(&project, &options, 3001, 22, &config_routes).unwrap();
         // Framework page route should use index 22
         assert!(
             result.contains("_http_route(\"GET\", \"/test\", 22)"),
