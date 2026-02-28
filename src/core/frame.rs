@@ -15,14 +15,41 @@ const FRAME_REPO_NAME: &str = "cleen-framework";
 pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> Result<()> {
     let config = Config::load()?;
 
-    // Determine version to install
+    // Fetch releases from GitHub early (needed to resolve "latest")
+    let github_client = GitHubClient::new(config.github_api_token.clone());
+    println!("Fetching Frame releases...");
+
+    let releases = match github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
+        Ok(releases) => releases,
+        Err(e) => {
+            println!("Unable to fetch releases from GitHub: {e}");
+            println!(
+                "   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases"
+            );
+            return Ok(());
+        }
+    };
+
+    if releases.is_empty() {
+        println!("No releases found in the repository.");
+        println!("   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases");
+        return Ok(());
+    }
+
+    // Determine version to install (resolve "latest" from fetched releases)
     let frame_version = if let Some(v) = version {
-        v.to_string()
+        if v.eq_ignore_ascii_case("latest") {
+            let latest = releases[0].tag_name.trim_start_matches('v').to_string();
+            println!("Resolved latest version: {latest}");
+            latest
+        } else {
+            v.trim_start_matches('v').to_string()
+        }
     } else {
         // Auto-detect compatible version based on active compiler
         let compiler_version = config.active_version.as_ref().ok_or_else(|| {
-            println!("⚠️  No compiler is currently active.");
-            println!("   Frame CLI requires a Clean Language compiler.");
+            println!("No compiler is currently active.");
+            println!("   Frame requires a Clean Language compiler.");
             println!();
             println!("To install a compiler first:");
             println!("   cleen install latest");
@@ -33,16 +60,12 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         let matrix = compatibility::CompatibilityMatrix::new();
         match matrix.find_compatible_frame_version(compiler_version) {
             Some(v) => {
-                println!("✓ Found compatible Frame CLI version: {v}");
+                println!("Found compatible Frame version: {v}");
                 v
             }
             None => {
-                println!(
-                    "⚠️  No compatible Frame CLI version found for compiler {compiler_version}"
-                );
-                println!("   Frame CLI requires compiler >= 0.14.0");
-                println!("   • Frame 1.0.0 requires compiler >= 0.14.0");
-                println!("   • Frame 2.0.0 requires compiler >= 0.16.0");
+                println!("No compatible Frame version found for compiler {compiler_version}");
+                println!("   Frame requires compiler >= 0.14.0");
                 println!();
                 println!("To upgrade your compiler:");
                 println!("   cleen install latest");
@@ -58,102 +81,77 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
     // Check if version is already installed
     let version_dir = get_frame_version_dir(&config, &frame_version);
     if version_dir.exists() {
-        println!("✓ Frame CLI version {frame_version} is already installed");
+        println!("Frame version {frame_version} is already installed");
 
         // Ensure this version is set as active
         let mut config = Config::load()?;
         if config.frame_version.as_deref() != Some(&frame_version) {
             config.frame_version = Some(frame_version.clone());
             config.save()?;
-            update_frame_symlink(&config, &frame_version)?;
-            println!("  Activated Frame CLI version {frame_version}");
+            let _ = update_frame_symlink(&config, &frame_version);
+            println!("  Activated Frame version {frame_version}");
         }
 
         return Ok(());
     }
 
-    println!("Installing Frame CLI version: {frame_version}");
+    println!("Installing Frame version: {frame_version}");
 
     // Check compiler compatibility unless skipped
     if !skip_compatibility_check {
         if let Some(compiler_version) = &config.active_version {
             compatibility::check_frame_compatibility(compiler_version, &frame_version)?;
-            println!("✓ Compatible with compiler {compiler_version}");
+            println!("Compatible with compiler {compiler_version}");
         } else {
             return Err(CleenError::NoCompilerForFrame);
         }
     }
 
-    // Fetch releases from GitHub
-    let github_client = GitHubClient::new(config.github_api_token.clone());
-    println!("Fetching Frame CLI releases...");
-
-    let releases = match github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
-        Ok(releases) => releases,
-        Err(e) => {
-            println!("⚠️  Unable to fetch releases from GitHub: {e}");
-            println!(
-                "   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases"
-            );
-            return Ok(());
-        }
-    };
-
-    if releases.is_empty() {
-        println!("⚠️  No releases found in the repository.");
-        println!("   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases");
-        return Ok(());
-    }
-
-    // Find the specified version (with or without 'v' prefix)
+    // Find the specified version release
     let tag_name = format!("v{}", frame_version.trim_start_matches('v'));
     let release = releases
         .iter()
         .find(|r| r.tag_name == tag_name)
         .ok_or_else(|| {
-            println!("Available Frame CLI versions:");
+            println!("Available Frame versions:");
             for r in &releases {
-                println!("  • {}", r.tag_name.trim_start_matches('v'));
+                println!("  - {}", r.tag_name.trim_start_matches('v'));
             }
             CleenError::FrameVersionNotFound {
                 frame_version: frame_version.clone(),
             }
         })?;
 
-    // Find appropriate asset for current platform
+    // Find appropriate asset: try platform-specific binary first, then plugin tarball
     let platform_suffix = get_platform_suffix();
-    println!("Looking for asset matching platform: {platform_suffix}");
 
-    let asset = release
+    let platform_asset = release.assets.iter().find(|asset| {
+        let name_lower = asset.name.to_lowercase();
+        let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
+            || name_lower.contains("universal")
+            || name_lower.contains("any");
+        let is_archive = name_lower.ends_with(".tar.gz") || name_lower.ends_with(".zip");
+        matches_platform && is_archive
+    });
+
+    let plugin_asset = release
         .assets
         .iter()
-        .find(|asset| {
-            let name_lower = asset.name.to_lowercase();
-            let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
-                || name_lower.contains("universal")
-                || name_lower.contains("any");
-            let is_archive = name_lower.ends_with(".tar.gz") || name_lower.ends_with(".zip");
-            matches_platform && is_archive
-        })
-        .or_else(|| {
-            release.assets.iter().find(|asset| {
-                let name_lower = asset.name.to_lowercase();
-                let matches_platform = name_lower.contains(&platform_suffix.to_lowercase())
-                    || name_lower.contains("universal")
-                    || name_lower.contains("any");
-                let is_binary = name_lower.contains("frame") && !name_lower.ends_with(".json");
-                matches_platform && is_binary
-            })
-        })
-        .ok_or_else(|| {
-            println!("Available assets:");
-            for asset in &release.assets {
-                println!("  • {}", asset.name);
-            }
-            CleenError::BinaryNotFound {
-                name: format!("Frame CLI asset for platform {platform_suffix}"),
-            }
-        })?;
+        .find(|asset| asset.name.starts_with("frame-plugins-") && asset.name.ends_with(".tar.gz"));
+
+    let (asset, is_plugin_tarball) = if let Some(a) = platform_asset {
+        (a, false)
+    } else if let Some(a) = plugin_asset {
+        (a, true)
+    } else {
+        println!("Available assets:");
+        for asset in &release.assets {
+            println!("  - {}", asset.name);
+        }
+        return Err(CleenError::BinaryNotFound {
+            name: format!("Frame asset for version {frame_version}"),
+        });
+    };
 
     println!("Found asset: {}", asset.name);
 
@@ -172,76 +170,96 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             url: asset.browser_download_url.clone(),
         })?;
 
-    // Extract to version directory
-    std::fs::create_dir_all(&version_dir)?;
+    if is_plugin_tarball {
+        // Plugin tarball: extract to ~/.cleen/plugins/
+        let plugins_dir = config.get_plugins_dir();
+        std::fs::create_dir_all(&plugins_dir)?;
 
-    if asset.name.ends_with(".tar.gz") || asset.name.ends_with(".zip") {
-        println!("Extracting archive...");
+        println!("Extracting plugins to {}...", plugins_dir.display());
         downloader
-            .extract_archive(&download_path, &version_dir)
+            .extract_archive(&download_path, &plugins_dir)
             .map_err(|_e| CleenError::ExtractionError {
                 path: download_path.clone(),
             })?;
+
+        // Mark the version as installed in frame-versions dir
+        std::fs::create_dir_all(&version_dir)?;
+        std::fs::write(
+            version_dir.join(".installed"),
+            format!("plugins-only: {frame_version}\n"),
+        )?;
+
+        // Clean up temporary files
+        std::fs::remove_dir_all(&temp_dir)?;
+
+        // Update config with Frame version
+        let mut config = Config::load()?;
+        config.frame_version = Some(frame_version.clone());
+        config.save()?;
+
+        println!("Successfully installed Frame plugins version {frame_version}");
+        println!("   Plugins location: {}", plugins_dir.display());
     } else {
-        // Direct binary
-        let binary_name = if cfg!(windows) { "frame.exe" } else { "frame" };
-        let target_path = version_dir.join(binary_name);
-        std::fs::copy(&download_path, &target_path)?;
+        // Platform binary: extract to frame-versions dir
+        std::fs::create_dir_all(&version_dir)?;
+
+        if asset.name.ends_with(".tar.gz") || asset.name.ends_with(".zip") {
+            println!("Extracting archive...");
+            downloader
+                .extract_archive(&download_path, &version_dir)
+                .map_err(|_e| CleenError::ExtractionError {
+                    path: download_path.clone(),
+                })?;
+        } else {
+            let binary_name = if cfg!(windows) { "frame.exe" } else { "frame" };
+            let target_path = version_dir.join(binary_name);
+            std::fs::copy(&download_path, &target_path)?;
+        }
+
+        // Find the extracted binary and ensure it's executable
+        let binary_path = find_frame_binary_in_dir(&version_dir)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary_path)?.permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary_path, perms)?;
+        }
+
+        // Clean up temporary files
+        std::fs::remove_dir_all(&temp_dir)?;
+
+        // Validate the installed binary
+        if let Err(e) = validate_frame_binary(&binary_path) {
+            eprintln!("Warning: Installed Frame binary may have issues: {e}");
+        }
+
+        // Update config with Frame version
+        let mut config = Config::load()?;
+        config.frame_version = Some(frame_version.clone());
+        config.save()?;
+
+        // Update Frame symlink
+        update_frame_symlink(&config, &frame_version)?;
+
+        println!("Successfully installed Frame version {frame_version}");
+        println!("   Binary location: {binary_path:?}");
     }
 
-    // Find the extracted binary and ensure it's executable
-    let binary_path = find_frame_binary_in_dir(&version_dir)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&binary_path)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&binary_path, perms)?;
-    }
-
-    // Clean up temporary files
-    std::fs::remove_dir_all(&temp_dir)?;
-
-    // Validate the installed binary
-    print!("🔍 Validating Frame CLI installation...");
-    if let Err(e) = validate_frame_binary(&binary_path) {
-        println!();
-        eprintln!("⚠️  Warning: Installed Frame CLI may have issues: {e}");
-        eprintln!("   The binary was installed but may not function correctly.");
-    } else {
-        println!(" ✅");
-    }
-
-    // Update config with Frame version
-    let mut config = Config::load()?;
-    config.frame_version = Some(frame_version.clone());
-    config.save()?;
-
-    // Update Frame symlink
-    update_frame_symlink(&config, &frame_version)?;
-
-    println!("✅ Successfully installed Frame CLI version {frame_version}");
-    println!("   Binary location: {binary_path:?}");
     println!();
 
     // Auto-install Clean Server if not already installed
     let config = Config::load()?;
     if config.server_version.is_none() {
-        println!("📦 Installing Clean Server (required for running Frame applications)...");
+        println!("Installing Clean Server (required for running Frame applications)...");
         println!();
         if let Err(e) = crate::core::server::install_server(None) {
-            println!("⚠️  Warning: Could not auto-install Clean Server: {e}");
+            println!("Warning: Could not auto-install Clean Server: {e}");
             println!("   You can install it manually with: cleen server install");
         }
         println!();
     }
-
-    println!("Frame CLI is now available:");
-    println!("   frame --version");
-    println!();
-    println!("To create a new project:");
-    println!("   cleen frame new myapp");
 
     Ok(())
 }
