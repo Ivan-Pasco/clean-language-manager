@@ -146,7 +146,6 @@ pub fn build_plugin() -> Result<()> {
     let output_path = current_dir.join("plugin.wasm");
     let output = Command::new(&compiler_path)
         .arg("compile")
-        .arg("-i")
         .arg(&source_path)
         .arg("-o")
         .arg(&output_path)

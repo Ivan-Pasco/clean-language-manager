@@ -54,14 +54,14 @@ impl CompatibilityMatrix {
     pub fn get_required_compiler_version(&self, frame_version: &str) -> Option<String> {
         let normalized = frame_version.trim_start_matches('v');
 
-        match normalized {
-            // Frame 1.0.0 requires compiler >= 0.14.0
-            "1.0.0" => Some("0.14.0".to_string()),
-            // Frame 2.0.0 requires compiler >= 0.16.0
-            "2.0.0" => Some("0.16.0".to_string()),
-            // Legacy support for 0.1.0 if it exists
-            "0.1.0" => Some("0.14.0".to_string()),
-            _ => None,
+        // Use version ranges: any Frame >= 2.0.0 requires compiler >= 0.16.0
+        if is_version_gte(normalized, "2.0.0") {
+            Some("0.16.0".to_string())
+        } else if is_version_gte(normalized, "0.1.0") {
+            // All Frame versions >= 0.1.0 (including 1.x.x) require compiler >= 0.14.0
+            Some("0.14.0".to_string())
+        } else {
+            None
         }
     }
 
