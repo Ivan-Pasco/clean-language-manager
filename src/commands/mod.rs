@@ -7,7 +7,7 @@ pub mod list;
 pub mod local;
 pub mod plugin;
 pub mod sync;
+pub mod test;
 pub mod uninstall;
 pub mod update;
-pub mod test;
 pub mod use_version;

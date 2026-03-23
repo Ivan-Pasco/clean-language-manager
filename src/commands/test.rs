@@ -218,11 +218,7 @@ fn discover_test_files(file: Option<&str>, filter: Option<&str>) -> Result<Vec<P
     // Apply filter if provided
     if let Some(pattern) = filter {
         let pattern_lower = pattern.to_lowercase();
-        test_files.retain(|f| {
-            f.to_string_lossy()
-                .to_lowercase()
-                .contains(&pattern_lower)
-        });
+        test_files.retain(|f| f.to_string_lossy().to_lowercase().contains(&pattern_lower));
     }
 
     // Sort for consistent output
@@ -368,18 +364,12 @@ fn parse_test_results(output: &str, fallback_duration: u64) -> Vec<SingleTestRes
                         .and_then(|n| n.as_str())
                         .unwrap_or("unknown")
                         .to_string(),
-                    passed: t
-                        .get("passed")
-                        .and_then(|p| p.as_bool())
-                        .unwrap_or(false),
+                    passed: t.get("passed").and_then(|p| p.as_bool()).unwrap_or(false),
                     message: t
                         .get("message")
                         .and_then(|m| m.as_str())
                         .map(|s| s.to_string()),
-                    duration_ms: t
-                        .get("duration_ms")
-                        .and_then(|d| d.as_u64())
-                        .unwrap_or(0),
+                    duration_ms: t.get("duration_ms").and_then(|d| d.as_u64()).unwrap_or(0),
                 })
                 .collect();
         }

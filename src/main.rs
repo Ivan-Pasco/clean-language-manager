@@ -405,13 +405,8 @@ fn main() -> Result<()> {
             filter,
             verbose,
             timing,
-        } => commands::test::run_tests(
-            file.as_deref(),
-            filter.as_deref(),
-            verbose,
-            timing,
-        )
-        .map_err(|e| anyhow::anyhow!(e)),
+        } => commands::test::run_tests(file.as_deref(), filter.as_deref(), verbose, timing)
+            .map_err(|e| anyhow::anyhow!(e)),
         Commands::Server { command } => match command {
             ServerCommands::Install { version } => {
                 core::server::install_server(version.as_deref()).map_err(|e| anyhow::anyhow!(e))
