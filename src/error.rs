@@ -152,6 +152,10 @@ pub enum CleenError {
 
     #[error("Clean Server asset not found for version '{version}' on platform '{platform}'")]
     ServerAssetNotFound { version: String, platform: String },
+
+    // Test errors
+    #[error("Test error: {message}")]
+    TestError { message: String },
 }
 
 impl From<anyhow::Error> for CleenError {

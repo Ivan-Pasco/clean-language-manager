@@ -99,6 +99,20 @@ enum Commands {
         #[clap(subcommand)]
         command: ServerCommands,
     },
+    /// Run tests in a Clean Language project
+    Test {
+        /// Specific file to test (e.g., app/data/models/User.cln)
+        file: Option<String>,
+        /// Filter tests by name or file path pattern
+        #[clap(short, long)]
+        filter: Option<String>,
+        /// Show verbose output including compilation details
+        #[clap(short, long)]
+        verbose: bool,
+        /// Show timing information for each test
+        #[clap(short, long)]
+        timing: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -386,6 +400,18 @@ fn main() -> Result<()> {
                     .map_err(|e| anyhow::anyhow!(e))
             }
         },
+        Commands::Test {
+            file,
+            filter,
+            verbose,
+            timing,
+        } => commands::test::run_tests(
+            file.as_deref(),
+            filter.as_deref(),
+            verbose,
+            timing,
+        )
+        .map_err(|e| anyhow::anyhow!(e)),
         Commands::Server { command } => match command {
             ServerCommands::Install { version } => {
                 core::server::install_server(version.as_deref()).map_err(|e| anyhow::anyhow!(e))
