@@ -207,10 +207,11 @@ fn discover_test_files(file: Option<&str>, filter: Option<&str>) -> Result<Vec<P
     if let Ok(entries) = std::fs::read_dir(&cwd) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|e| e == "cln") {
-                if file_contains_tests(&path) {
-                    test_files.push(path);
-                }
+            if path.is_file()
+                && path.extension().is_some_and(|e| e == "cln")
+                && file_contains_tests(&path)
+            {
+                test_files.push(path);
             }
         }
     }
@@ -236,10 +237,11 @@ fn scan_directory_for_tests(dir: &Path, results: &mut Vec<PathBuf>) -> Result<()
 
         if path.is_dir() {
             scan_directory_for_tests(&path, results)?;
-        } else if path.is_file() && path.extension().is_some_and(|e| e == "cln") {
-            if file_contains_tests(&path) {
-                results.push(path);
-            }
+        } else if path.is_file()
+            && path.extension().is_some_and(|e| e == "cln")
+            && file_contains_tests(&path)
+        {
+            results.push(path);
         }
     }
 
