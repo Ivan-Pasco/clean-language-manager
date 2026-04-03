@@ -214,9 +214,7 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                     }
                 }
             } else {
-                eprintln!(
-                    "Warning: No plugin.toml found for {plugin_name}, using frame version"
-                );
+                eprintln!("Warning: No plugin.toml found for {plugin_name}, using frame version");
                 frame_version.clone()
             };
 
