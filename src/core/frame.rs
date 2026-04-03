@@ -171,16 +171,86 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         })?;
 
     if is_plugin_tarball {
-        // Plugin tarball: extract to ~/.cleen/plugins/
-        let plugins_dir = config.get_plugins_dir();
-        std::fs::create_dir_all(&plugins_dir)?;
+        // Plugin tarball: extract to a temp staging directory first
+        let staging_dir = temp_dir.join("staging");
+        std::fs::create_dir_all(&staging_dir)?;
 
-        println!("Extracting plugins to {}...", plugins_dir.display());
+        println!("Extracting plugins...");
         downloader
-            .extract_archive(&download_path, &plugins_dir)
+            .extract_archive(&download_path, &staging_dir)
             .map_err(|_e| CleenError::ExtractionError {
                 path: download_path.clone(),
             })?;
+
+        let plugins_dir = config.get_plugins_dir();
+        std::fs::create_dir_all(&plugins_dir)?;
+
+        // Iterate over extracted plugin directories, read plugin.toml for version,
+        // and move files into versioned subdirectories
+        let mut config = Config::load()?;
+        for entry in std::fs::read_dir(&staging_dir)? {
+            let entry = entry?;
+            let src_path = entry.path();
+
+            if !src_path.is_dir() {
+                continue;
+            }
+
+            let plugin_name = match src_path.file_name().and_then(|n| n.to_str()) {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+
+            // Read plugin.toml to get the plugin version
+            let manifest_path = src_path.join("plugin.toml");
+            let plugin_version = if manifest_path.exists() {
+                match crate::plugin::manifest::PluginManifest::load(&manifest_path) {
+                    Ok(manifest) => manifest.plugin.version,
+                    Err(_) => {
+                        eprintln!(
+                            "Warning: Could not parse plugin.toml for {plugin_name}, using frame version"
+                        );
+                        frame_version.clone()
+                    }
+                }
+            } else {
+                eprintln!(
+                    "Warning: No plugin.toml found for {plugin_name}, using frame version"
+                );
+                frame_version.clone()
+            };
+
+            // Create versioned subdirectory: ~/.cleen/plugins/<plugin>/<version>/
+            let version_dest = plugins_dir.join(&plugin_name).join(&plugin_version);
+            std::fs::create_dir_all(&version_dest)?;
+
+            // Move all files from the extracted plugin directory into the versioned directory
+            for file_entry in std::fs::read_dir(&src_path)? {
+                let file_entry = file_entry?;
+                let file_src = file_entry.path();
+                let file_name = file_entry.file_name();
+                let file_dst = version_dest.join(&file_name);
+
+                if file_src.is_dir() {
+                    if file_dst.exists() {
+                        std::fs::remove_dir_all(&file_dst)?;
+                    }
+                    crate::utils::fs::copy_dir_recursive(&file_src, &file_dst)?;
+                } else {
+                    std::fs::copy(&file_src, &file_dst)?;
+                }
+            }
+
+            // Activate this version: copy files to plugin root and write .active-version
+            crate::plugin::activate_plugin_version_root(&config, &plugin_name, &plugin_version)?;
+
+            // Update config with active plugin version
+            config
+                .active_plugins
+                .insert(plugin_name.clone(), plugin_version.clone());
+
+            println!("  Installed {plugin_name} v{plugin_version}");
+        }
 
         // Mark the version as installed in frame-versions dir
         std::fs::create_dir_all(&version_dir)?;
@@ -192,8 +262,7 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         // Clean up temporary files
         std::fs::remove_dir_all(&temp_dir)?;
 
-        // Update config with Frame version
-        let mut config = Config::load()?;
+        // Update config with Frame version and save
         config.frame_version = Some(frame_version.clone());
         config.save()?;
 
