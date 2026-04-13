@@ -185,9 +185,10 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         let plugins_dir = config.get_plugins_dir();
         std::fs::create_dir_all(&plugins_dir)?;
 
-        // Iterate over extracted plugin directories, read plugin.toml for version,
+        // Iterate over extracted plugin directories, read plugin.toml for version/name,
         // and move files into versioned subdirectories
         let mut config = Config::load()?;
+        let mut installed_plugin_names: Vec<String> = Vec::new();
         for entry in std::fs::read_dir(&staging_dir)? {
             let entry = entry?;
             let src_path = entry.path();
@@ -196,27 +197,29 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 continue;
             }
 
-            let plugin_name = match src_path.file_name().and_then(|n| n.to_str()) {
+            let folder_name = match src_path.file_name().and_then(|n| n.to_str()) {
                 Some(name) => name.to_string(),
                 None => continue,
             };
 
-            // Read plugin.toml to get the plugin version
+            // Read plugin.toml to get the canonical plugin name and version
             let manifest_path = src_path.join("plugin.toml");
-            let plugin_version = if manifest_path.exists() {
+            let (plugin_name, plugin_version) = if manifest_path.exists() {
                 match crate::plugin::manifest::PluginManifest::load(&manifest_path) {
-                    Ok(manifest) => manifest.plugin.version,
+                    Ok(manifest) => (manifest.plugin.name, manifest.plugin.version),
                     Err(_) => {
                         eprintln!(
-                            "Warning: Could not parse plugin.toml for {plugin_name}, using frame version"
+                            "Warning: Could not parse plugin.toml for {folder_name}, using folder name and frame version"
                         );
-                        frame_version.clone()
+                        (folder_name.clone(), frame_version.clone())
                     }
                 }
             } else {
-                eprintln!("Warning: No plugin.toml found for {plugin_name}, using frame version");
-                frame_version.clone()
+                eprintln!("Warning: No plugin.toml found for {folder_name}, using folder name and frame version");
+                (folder_name.clone(), frame_version.clone())
             };
+
+            installed_plugin_names.push(plugin_name.clone());
 
             // Create versioned subdirectory: ~/.cleen/plugins/<plugin>/<version>/
             let version_dest = plugins_dir.join(&plugin_name).join(&plugin_version);
@@ -248,6 +251,23 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 .insert(plugin_name.clone(), plugin_version.clone());
 
             println!("  Installed {plugin_name} v{plugin_version}");
+        }
+
+        // Clean up known renamed plugin folders.
+        // Only removes folders for plugins that were renamed — not independently installed plugins.
+        let known_renames: &[(&str, &str)] = &[
+            ("frame.httpserver", "frame.server"),
+        ];
+        for (old_name, new_name) in known_renames {
+            let old_path = plugins_dir.join(old_name);
+            if old_path.exists() && installed_plugin_names.contains(&new_name.to_string()) {
+                if let Err(e) = std::fs::remove_dir_all(&old_path) {
+                    eprintln!("Warning: Could not remove stale plugin {old_name}: {e}");
+                } else {
+                    config.active_plugins.remove(*old_name);
+                    println!("  Removed stale plugin: {old_name} (renamed to {new_name})");
+                }
+            }
         }
 
         // Mark the version as installed in frame-versions dir

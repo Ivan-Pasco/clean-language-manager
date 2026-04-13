@@ -33,7 +33,7 @@ This is a **fully implemented and functional project**. The codebase is complete
 
 ## Architecture Boundary Rules
 
-**CRITICAL: Read `../system-documents/ARCHITECTURE_BOUNDARIES.md` before implementing ANY new functionality.**
+**CRITICAL: Read `../management/ARCHITECTURE_BOUNDARIES.md` before implementing ANY new functionality.**
 
 The manager is a **version manager and orchestrator**. It delegates to other binaries — it does NOT reimplement their logic.
 
@@ -75,7 +75,7 @@ The following files contain framework code that must be extracted to `clean-fram
 - `src/core/discovery.rs` (745 lines) — entire file is misplaced
 - `src/core/frame.rs` (~663 lines) — `create_project()`, `build_project()`, `scan_project()` and template functions
 
-See: `../system-documents/cross-component-prompts/manager-extract-framework-code.md`
+See: `../management/cross-component-prompts/manager-extract-framework-code.md`
 
 ## Current Implementation
 
@@ -145,7 +145,7 @@ Instead:
 
 1. **Document the issue** by creating a prompt/task description
 2. **Save the prompt** in a file that can be executed by the AI instance working in the correct folder
-3. **Location for cross-component prompts**: Save prompts in `../system-documents/cross-component-prompts/` at the project root
+3. **Location for cross-component prompts**: Save prompts in `../management/cross-component-prompts/` at the project root
 
 ### Prompt Format for Cross-Component Issues
 
