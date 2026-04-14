@@ -255,9 +255,7 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
         // Clean up known renamed plugin folders.
         // Only removes folders for plugins that were renamed — not independently installed plugins.
-        let known_renames: &[(&str, &str)] = &[
-            ("frame.httpserver", "frame.server"),
-        ];
+        let known_renames: &[(&str, &str)] = &[("frame.httpserver", "frame.server")];
         for (old_name, new_name) in known_renames {
             let old_path = plugins_dir.join(old_name);
             if old_path.exists() && installed_plugin_names.contains(&new_name.to_string()) {
