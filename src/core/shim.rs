@@ -25,6 +25,9 @@ impl ShimManager {
         // Create smart shim that checks for project versions
         self.create_smart_shim(&shim_path, &clean_version)?;
 
+        // Also link clean-language-server if present in this version
+        self.create_lsp_shim(&clean_version)?;
+
         println!("✅ Activated Clean Language version {clean_version}");
 
         Ok(())
@@ -37,7 +40,28 @@ impl ShimManager {
             std::fs::remove_file(&shim_path)?;
         }
 
+        let lsp_shim_path = self.config.get_lsp_shim_path();
+        if lsp_shim_path.exists() {
+            std::fs::remove_file(&lsp_shim_path)?;
+        }
+
         Ok(())
+    }
+
+    fn create_lsp_shim(&self, version: &str) -> Result<()> {
+        let binary_path = {
+            let clean_path = self.config.get_version_lsp_binary(version);
+            if clean_path.exists() {
+                clean_path
+            } else {
+                let v_version = normalize::to_github_version(version);
+                let v_path = self.config.get_version_lsp_binary(&v_version);
+                if v_path.exists() { v_path } else { return Ok(()); }
+            }
+        };
+
+        let shim_path = self.config.get_lsp_shim_path();
+        self.create_wrapper_script(&binary_path, &shim_path)
     }
 
     #[allow(dead_code)]

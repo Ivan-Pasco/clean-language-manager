@@ -202,6 +202,24 @@ impl Config {
         self.get_bin_dir().join(binary_name)
     }
 
+    pub fn get_version_lsp_binary(&self, version: &str) -> PathBuf {
+        let binary_name = if cfg!(windows) {
+            "clean-language-server.exe"
+        } else {
+            "clean-language-server"
+        };
+        self.get_version_dir(version).join(binary_name)
+    }
+
+    pub fn get_lsp_shim_path(&self) -> PathBuf {
+        let binary_name = if cfg!(windows) {
+            "clean-language-server.exe"
+        } else {
+            "clean-language-server"
+        };
+        self.get_bin_dir().join(binary_name)
+    }
+
     pub fn should_check_updates(&self) -> bool {
         if !self.check_updates {
             return false;
