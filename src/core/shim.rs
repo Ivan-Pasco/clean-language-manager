@@ -56,7 +56,11 @@ impl ShimManager {
             } else {
                 let v_version = normalize::to_github_version(version);
                 let v_path = self.config.get_version_lsp_binary(&v_version);
-                if v_path.exists() { v_path } else { return Ok(()); }
+                if v_path.exists() {
+                    v_path
+                } else {
+                    return Ok(());
+                }
             }
         };
 
