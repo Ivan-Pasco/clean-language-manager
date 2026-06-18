@@ -34,17 +34,10 @@ impl ShimManager {
     }
 
     pub fn remove_shim(&self) -> Result<()> {
-        let shim_path = self.config.get_shim_path();
-
-        if shim_path.exists() {
-            std::fs::remove_file(&shim_path)?;
-        }
-
-        let lsp_shim_path = self.config.get_lsp_shim_path();
-        if lsp_shim_path.exists() {
-            std::fs::remove_file(&lsp_shim_path)?;
-        }
-
+        // Use symlink-aware removal so dangling symlinks (left over from a
+        // previously-removed version) don't leak past the cleanup.
+        crate::utils::fs::remove_path_if_exists(&self.config.get_shim_path())?;
+        crate::utils::fs::remove_path_if_exists(&self.config.get_lsp_shim_path())?;
         Ok(())
     }
 

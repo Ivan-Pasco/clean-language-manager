@@ -189,6 +189,7 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         // and move files into versioned subdirectories
         let mut config = Config::load()?;
         let mut installed_plugin_names: Vec<String> = Vec::new();
+        let mut incompatible_plugins: Vec<(String, String, String, String)> = Vec::new();
         for entry in std::fs::read_dir(&staging_dir)? {
             let entry = entry?;
             let src_path = entry.path();
@@ -202,11 +203,36 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 None => continue,
             };
 
-            // Read plugin.toml to get the canonical plugin name and version
+            // Read plugin.toml to get the canonical plugin name and version, and
+            // to check whether the active compiler satisfies the plugin's
+            // declared min_compiler_version.
             let manifest_path = src_path.join("plugin.toml");
             let (plugin_name, plugin_version) = if manifest_path.exists() {
                 match crate::plugin::manifest::PluginManifest::load(&manifest_path) {
-                    Ok(manifest) => (manifest.plugin.name, manifest.plugin.version),
+                    Ok(manifest) => {
+                        if let Err(e) =
+                            crate::plugin::check_plugin_compatibility(&config, &manifest)
+                        {
+                            if let crate::error::CleenError::PluginIncompatible {
+                                name,
+                                required,
+                                current,
+                            } = &e
+                            {
+                                incompatible_plugins.push((
+                                    name.clone(),
+                                    manifest.plugin.version.clone(),
+                                    required.clone(),
+                                    current.clone(),
+                                ));
+                            } else {
+                                eprintln!(
+                                    "Warning: compatibility check failed for {folder_name}: {e}"
+                                );
+                            }
+                        }
+                        (manifest.plugin.name, manifest.plugin.version)
+                    }
                     Err(_) => {
                         eprintln!(
                             "Warning: Could not parse plugin.toml for {folder_name}, using folder name and frame version"
@@ -284,6 +310,20 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
         println!("Successfully installed Frame plugins version {frame_version}");
         println!("   Plugins location: {}", plugins_dir.display());
+
+        if !incompatible_plugins.is_empty() {
+            eprintln!();
+            eprintln!("⚠️  Compiler / plugin version mismatch:");
+            for (name, plugin_v, required, current) in &incompatible_plugins {
+                eprintln!(
+                    "   • {name} v{plugin_v} requires compiler >= {required} (active: {current})"
+                );
+            }
+            eprintln!();
+            eprintln!("   `cln build` will fail with PLUGIN-REGISTRY-DRIFT until either:");
+            eprintln!("     - the compiler is upgraded:   cleen install latest");
+            eprintln!("     - an older Frame version is activated:   cleen frame use <version>");
+        }
     } else {
         // Platform binary: extract to frame-versions dir
         std::fs::create_dir_all(&version_dir)?;
@@ -430,11 +470,9 @@ pub fn uninstall_frame_version(version: &str) -> Result<()> {
         config.frame_version = None;
         config.save()?;
 
-        // Remove symlink
+        // Remove symlink (handles broken links too)
         let shim_path = config.get_frame_shim_path();
-        if shim_path.exists() {
-            std::fs::remove_file(&shim_path)?;
-        }
+        crate::utils::fs::remove_path_if_exists(&shim_path)?;
     }
 
     // Remove version directory
@@ -450,12 +488,10 @@ fn update_frame_symlink(config: &Config, version: &str) -> Result<()> {
     let binary_path = get_frame_binary_path(config, version);
     let shim_path = config.get_frame_shim_path();
 
-    // Remove existing symlink if it exists
-    if shim_path.exists() {
-        std::fs::remove_file(&shim_path)?;
-    }
+    // Use symlink-aware removal so a dangling symlink left over from a
+    // previously-uninstalled version doesn't trip `symlink()` with EEXIST.
+    crate::utils::fs::remove_path_if_exists(&shim_path)?;
 
-    // Create new symlink
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(&binary_path, &shim_path)?;

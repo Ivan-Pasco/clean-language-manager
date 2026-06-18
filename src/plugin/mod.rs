@@ -189,11 +189,12 @@ pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) 
         let file_name = entry.file_name();
         let dst_path = plugin_dir.join(&file_name);
 
+        // Clear whatever is at dst first — including dangling symlinks. Using
+        // `exists()` here would silently skip broken links and the next
+        // `create_dir_all` / `copy` would fail with EEXIST.
+        fs_utils::remove_path_if_exists(&dst_path)?;
+
         if src_path.is_dir() {
-            // Remove existing directory at root level before copying
-            if dst_path.exists() {
-                fs::remove_dir_all(&dst_path)?;
-            }
             fs_utils::copy_dir_recursive(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path)?;
@@ -255,8 +256,12 @@ pub fn parse_plugin_specifier(specifier: &str) -> (String, Option<String>) {
     }
 }
 
-/// Check if the current compiler version is compatible with a plugin
-#[allow(dead_code)]
+/// Check if the current compiler version is compatible with a plugin.
+///
+/// Returns `Err(PluginIncompatible)` when the plugin's manifest declares a
+/// `min_compiler_version` that the active compiler does not satisfy. Called
+/// during frame meta-bundle install to surface registry-drift conditions
+/// before the user discovers them at `cln build` time.
 pub fn check_plugin_compatibility(config: &Config, manifest: &PluginManifest) -> Result<()> {
     let current_version = match &config.active_version {
         Some(v) => v.clone(),
@@ -278,7 +283,6 @@ pub fn check_plugin_compatibility(config: &Config, manifest: &PluginManifest) ->
 }
 
 /// Simple version comparison (current >= required)
-#[allow(dead_code)]
 fn version_satisfies(current: &str, required: &str) -> bool {
     // Strip 'v' prefix if present
     let current = current.trim_start_matches('v');
