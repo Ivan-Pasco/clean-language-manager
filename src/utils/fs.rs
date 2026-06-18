@@ -97,6 +97,24 @@ pub fn is_executable(path: &Path) -> bool {
     }
 }
 
+pub fn make_executable(path: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(path)?.permissions();
+        perms.set_mode(perms.mode() | 0o755);
+        std::fs::set_permissions(path, perms)?;
+    }
+
+    // On Windows, executable permission is determined by file extension
+    #[cfg(windows)]
+    {
+        let _ = path; // Suppress unused warning
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,22 +178,4 @@ mod tests {
 
         fs::remove_dir_all(&tmp).unwrap();
     }
-}
-
-pub fn make_executable(path: &Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(path)?.permissions();
-        perms.set_mode(perms.mode() | 0o755);
-        std::fs::set_permissions(path, perms)?;
-    }
-
-    // On Windows, executable permission is determined by file extension
-    #[cfg(windows)]
-    {
-        let _ = path; // Suppress unused warning
-    }
-
-    Ok(())
 }
