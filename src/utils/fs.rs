@@ -271,15 +271,21 @@ mod tests {
         atomic_write(&target, b"new", Some(0o755)).unwrap();
 
         assert_eq!(fs::read(&target).unwrap(), b"new");
-        // Inode replacement is the load-bearing property: it's what drops
-        // any xattrs the kernel pinned to the old file.
-        assert_ne!(inode_of(&target), old_inode);
 
         #[cfg(unix)]
         {
+            // Inode replacement is the load-bearing property: it's what drops
+            // any xattrs the kernel pinned to the old file. Only meaningful on
+            // unix — Windows has no notion of an inode here.
+            assert_ne!(inode_of(&target), old_inode);
+
             use std::os::unix::fs::PermissionsExt;
             let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
             assert_eq!(mode, 0o755);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = old_inode;
         }
 
         // No leftover temp files in the parent.
