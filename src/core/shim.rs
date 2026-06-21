@@ -15,12 +15,31 @@ impl ShimManager {
     pub fn create_shim(&self, version: &str) -> Result<()> {
         let clean_version = normalize::to_clean_version(version);
         let shim_path = self.config.get_shim_path();
+        let lsp_shim_path = self.config.get_lsp_shim_path();
+        let bin_dir = self.config.get_bin_dir();
+
+        // Older installs created the shim as a bash wrapper script. On
+        // macOS Sequoia those scripts inherit `com.apple.provenance` from
+        // the cleen binary (itself downloaded via curl) and become
+        // immutable — rm/chmod/rename-over all fail with EPERM even from
+        // sudo. The only escape is to rename the parent dir. Detect and
+        // perform that shuffle here so the subsequent symlink creation
+        // path runs against a fresh, unlocked directory.
+        let shim_name = shim_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("cln");
+        let lsp_name = lsp_shim_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("clean-language-server");
+        let _ = fs::evict_locked_shims(&bin_dir, &[shim_name, lsp_name]);
 
         // Remove existing shim if it exists
         self.remove_shim()?;
 
         // Ensure bin directory exists
-        fs::ensure_dir_exists(&self.config.get_bin_dir())?;
+        fs::ensure_dir_exists(&bin_dir)?;
 
         // Create smart shim that checks for project versions
         self.create_smart_shim(&shim_path, &clean_version)?;
@@ -146,14 +165,15 @@ impl ShimManager {
 
     #[cfg(unix)]
     fn create_wrapper_script(&self, binary_path: &Path, shim_path: &Path) -> Result<()> {
-        let script_content = format!("#!/bin/bash\nexec \"{}\" \"$@\"\n", binary_path.display());
-
-        // Atomic write: replaces the destination's inode rather than mutating
-        // in place. On macOS this is what defeats `com.apple.provenance`-based
-        // modification locks inherited onto the previous shim — the old inode
-        // (and its xattrs) is unlinked by the rename.
-        fs::atomic_write(shim_path, script_content.as_bytes(), Some(0o755))?;
-
+        // Symlink, not a bash wrapper. macOS Sequoia's `com.apple.provenance`
+        // xattr makes wrapper scripts immutable to all user-level operations
+        // (rm/chmod/xattr-c/rename-over all return EPERM, even via sudo).
+        // Symlinks are not subject to that lock, so they can be atomically
+        // rename-replaced indefinitely. The original wrapper script was
+        // chosen "to prevent exec issues" (commit 35db590, Aug 2025) but no
+        // concrete issue was documented, the prior code used symlinks
+        // without trouble, and the frame shim has always used symlinks.
+        fs::atomic_replace_symlink(shim_path, binary_path)?;
         Ok(())
     }
 
