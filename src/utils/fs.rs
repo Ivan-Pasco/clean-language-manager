@@ -186,9 +186,8 @@ pub fn atomic_write(path: &Path, contents: &[u8], unix_mode: Option<u32>) -> Res
     }
 
     strip_macos_xattrs(&tmp);
-    std::fs::rename(&tmp, path).map_err(|e| {
+    std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
-        e
     })?;
     Ok(())
 }
