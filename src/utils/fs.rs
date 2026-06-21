@@ -467,8 +467,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn atomic_replace_symlink_replaces_existing_symlink() {
-        let tmp =
-            std::env::temp_dir().join(format!("cleen-fs-symlink-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("cleen-fs-symlink-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
@@ -479,14 +478,20 @@ mod tests {
         let link = tmp.join("cln");
 
         atomic_replace_symlink(&link, &target_a).unwrap();
-        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(fs::read(&link).unwrap(), b"a");
 
         // Replacing the existing symlink with one pointing at a different
         // target is the load-bearing operation: `cleen use <other>` should
         // succeed against an existing symlink.
         atomic_replace_symlink(&link, &target_b).unwrap();
-        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(fs::read_link(&link).unwrap(), target_b);
         assert_eq!(fs::read(&link).unwrap(), b"b");
 
@@ -494,7 +499,11 @@ mod tests {
         let leftovers: Vec<_> = fs::read_dir(&tmp)
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with(".cln.cleen-tmp."))
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with(".cln.cleen-tmp.")
+            })
             .collect();
         assert!(leftovers.is_empty(), "found leftover temp symlinks");
 
