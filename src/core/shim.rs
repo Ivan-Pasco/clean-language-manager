@@ -148,13 +148,11 @@ impl ShimManager {
     fn create_wrapper_script(&self, binary_path: &Path, shim_path: &Path) -> Result<()> {
         let script_content = format!("#!/bin/bash\nexec \"{}\" \"$@\"\n", binary_path.display());
 
-        std::fs::write(shim_path, script_content)?;
-
-        // Make executable
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(shim_path)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(shim_path, perms)?;
+        // Atomic write: replaces the destination's inode rather than mutating
+        // in place. On macOS this is what defeats `com.apple.provenance`-based
+        // modification locks inherited onto the previous shim — the old inode
+        // (and its xattrs) is unlinked by the rename.
+        fs::atomic_write(shim_path, script_content.as_bytes(), Some(0o755))?;
 
         Ok(())
     }
@@ -167,7 +165,7 @@ impl ShimManager {
 
         let script_content = format!("@echo off\n\"{}\" %*\n", binary_path.display());
 
-        std::fs::write(shim_path, script_content)?;
+        fs::atomic_write(&shim_path, script_content.as_bytes(), None)?;
         Ok(())
     }
 

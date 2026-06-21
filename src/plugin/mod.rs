@@ -201,9 +201,11 @@ pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) 
         }
     }
 
-    // Write .active-version marker file
+    // Write .active-version marker file via atomic rename — the previous
+    // marker may carry inherited `com.apple.provenance` that would block
+    // in-place mutation on macOS Sequoia.
     let active_version_path = plugin_dir.join(".active-version");
-    fs::write(&active_version_path, version)?;
+    fs_utils::atomic_write(&active_version_path, version.as_bytes(), None)?;
 
     Ok(())
 }

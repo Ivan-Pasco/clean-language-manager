@@ -1,3 +1,4 @@
+use crate::utils::fs as cleen_fs;
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use std::fs::File;
@@ -43,6 +44,11 @@ impl Downloader {
             ));
         }
 
+        // curl writes inherit `com.apple.provenance` on macOS Sequoia when
+        // the calling process itself carries it. Strip on the freshly-written
+        // file so downstream extract/copy operations start from a clean slate.
+        cleen_fs::strip_macos_xattrs(destination);
+
         println!("Downloaded to {destination:?}");
         Ok(())
     }
@@ -64,6 +70,10 @@ impl Downloader {
         } else {
             return Err(anyhow::anyhow!("Unsupported archive format: {}", file_name));
         }
+
+        // Files created by a provenance-tagged process inherit the xattr.
+        // Strip recursively so the installed version dir is clean.
+        cleen_fs::strip_macos_xattrs_recursive(destination);
 
         println!("Extraction completed");
         Ok(())

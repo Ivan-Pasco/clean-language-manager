@@ -301,6 +301,11 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             format!("plugins-only: {frame_version}\n"),
         )?;
 
+        // Plugin files were copied (not atomically replaced) into per-plugin
+        // version dirs and the activation root. Strip macOS provenance so the
+        // next `cleen frame install` can overwrite plugin.wasm in place.
+        crate::utils::fs::strip_macos_xattrs_recursive(&plugins_dir);
+
         // Clean up temporary files
         std::fs::remove_dir_all(&temp_dir)?;
 
@@ -351,6 +356,9 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             perms.set_mode(0o755);
             std::fs::set_permissions(&binary_path, perms)?;
         }
+
+        // Belt-and-braces strip for the direct-binary branch above.
+        crate::utils::fs::strip_macos_xattrs_recursive(&version_dir);
 
         // Clean up temporary files
         std::fs::remove_dir_all(&temp_dir)?;

@@ -115,6 +115,84 @@ pub fn make_executable(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Strip extended attributes from `path` (macOS only, best-effort, no-op elsewhere).
+///
+/// macOS Sequoia inherits `com.apple.provenance` onto files created by a
+/// process whose own binary carries that xattr — typical for `cleen` itself
+/// when it was installed via `curl | sh`. The xattr blocks later in-place
+/// mutation of those files, which is what breaks `cleen use` when it tries
+/// to update the shim.
+///
+/// Errors are intentionally swallowed: some attributes are kernel-protected
+/// and the in-place strip is not the load-bearing fix — [`atomic_write`] is.
+/// This just keeps directory listings tidy.
+pub fn strip_macos_xattrs(path: &Path) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("/usr/bin/xattr")
+            .arg("-c")
+            .arg(path)
+            .output();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+    }
+}
+
+/// Recursive variant of [`strip_macos_xattrs`] for use after archive extraction.
+pub fn strip_macos_xattrs_recursive(path: &Path) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("/usr/bin/xattr")
+            .arg("-cr")
+            .arg(path)
+            .output();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+    }
+}
+
+/// Atomically write `contents` to `path` via temp-file + rename.
+///
+/// The destination's inode is replaced, not mutated in place. Any extended
+/// attributes on the old inode (e.g. `com.apple.provenance` that blocks
+/// modification) go away with it — the new inode starts fresh. On unix,
+/// `unix_mode` is applied to the temp file before the rename so the
+/// destination appears atomically with the correct permissions.
+pub fn atomic_write(path: &Path, contents: &[u8], unix_mode: Option<u32>) -> Result<()> {
+    let parent = path.parent().ok_or_else(|| CleenError::IoError {
+        message: format!("path has no parent: {}", path.display()),
+    })?;
+    ensure_dir_exists(parent)?;
+    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let tmp = parent.join(format!(".{file_name}.cleen-tmp.{}", std::process::id()));
+    let _ = std::fs::remove_file(&tmp);
+
+    std::fs::write(&tmp, contents)?;
+
+    #[cfg(unix)]
+    {
+        if let Some(m) = unix_mode {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(m))?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = unix_mode;
+    }
+
+    strip_macos_xattrs(&tmp);
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e
+    })?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +255,57 @@ mod tests {
         assert!(!sub.exists());
 
         fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn atomic_write_replaces_existing_file_and_applies_mode() {
+        let tmp = std::env::temp_dir().join(format!("cleen-fs-atomic-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let target = tmp.join("cln");
+
+        // Pre-existing file we'd normally try to overwrite in place.
+        fs::write(&target, b"old").unwrap();
+        let old_inode = inode_of(&target);
+
+        atomic_write(&target, b"new", Some(0o755)).unwrap();
+
+        assert_eq!(fs::read(&target).unwrap(), b"new");
+        // Inode replacement is the load-bearing property: it's what drops
+        // any xattrs the kernel pinned to the old file.
+        assert_ne!(inode_of(&target), old_inode);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o755);
+        }
+
+        // No leftover temp files in the parent.
+        let leftovers: Vec<_> = fs::read_dir(&tmp)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with(".cln.cleen-tmp.")
+            })
+            .collect();
+        assert!(leftovers.is_empty(), "found leftover temp files");
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn inode_of(path: &Path) -> u64 {
+        use std::os::unix::fs::MetadataExt;
+        fs::metadata(path).unwrap().ino()
+    }
+
+    #[cfg(not(unix))]
+    fn inode_of(_path: &Path) -> u64 {
+        0
     }
 }

@@ -163,6 +163,10 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
         std::fs::set_permissions(&binary_path, perms)?;
     }
 
+    // Belt-and-braces strip for the direct-binary branch above where the
+    // archive extractor's recursive strip didn't run.
+    crate::utils::fs::strip_macos_xattrs_recursive(&version_dir);
+
     // compile-options.json is stored per-version in the version directory
     // The extraction already placed it there, just verify and inform the user
     let options_path = version_dir.join("compile-options.json");
