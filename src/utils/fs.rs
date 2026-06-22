@@ -253,6 +253,162 @@ pub fn atomic_replace_symlink(path: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursive walk that reports whether any regular file in `dir` carries
+/// `com.apple.provenance`. Always false on non-macOS targets.
+///
+/// Symlinks are not followed (they cannot themselves carry the lock and
+/// following them could leave the host filesystem). Read errors are
+/// treated as "not locked" — the caller's subsequent write will surface
+/// the real I/O problem with its own path attached.
+pub fn dir_has_provenance_lock(dir: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return false;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if meta.file_type().is_dir() {
+                if dir_has_provenance_lock(&path) {
+                    return true;
+                }
+            } else if has_provenance_lock(&path) {
+                return true;
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = dir;
+        false
+    }
+}
+
+/// Evict an entire directory by renaming it to `<dir>.locked-<ts>` when
+/// any file inside carries `com.apple.provenance`. Returns `Ok(true)` if
+/// a rename ran.
+///
+/// Used for write paths that own the directory wholesale — e.g. a plugin
+/// version dir at `~/.cleen/plugins/<name>/<ver>/` that is about to be
+/// re-shipped. The locked files travel with the rename (the lock is
+/// keyed on (parent_inode, name) within the original parent, not on the
+/// containing directory's own inode), leaving the original path free for
+/// `create_dir_all`. The graveyard remains on disk so users can inspect
+/// what was preserved.
+///
+/// No-op on non-macOS targets or when the dir is missing.
+pub fn evict_locked_dir(dir: &Path) -> Result<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        if !dir.exists() {
+            return Ok(false);
+        }
+        if !dir_has_provenance_lock(dir) {
+            return Ok(false);
+        }
+
+        let parent = dir.parent().ok_or_else(|| CleenError::IoError {
+            message: format!("dir has no parent: {}", dir.display()),
+        })?;
+        let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("locked");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let graveyard = parent.join(format!("{dir_name}.locked-{ts}"));
+
+        std::fs::rename(dir, &graveyard).map_err(|e| CleenError::IoError {
+            message: format!(
+                "could not evict provenance-locked directory {}: {e}",
+                dir.display()
+            ),
+        })?;
+
+        eprintln!(
+            "  Evicted provenance-locked directory — preserved at {}",
+            graveyard.display()
+        );
+        Ok(true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = dir;
+        Ok(false)
+    }
+}
+
+/// Rename a single provenance-locked file to a sibling graveyard name so
+/// the original path becomes free for a new write. Returns `Ok(true)` if
+/// a rename ran.
+///
+/// Used for write paths that must replace a single locked file inside a
+/// directory that holds unrelated content we want to keep — e.g. when
+/// `activate_plugin_version_root` is overwriting `plugin.wasm` at the
+/// plugin root while sibling version subdirectories must remain intact.
+///
+/// Best-effort: if the rename itself is rejected (the kernel can pin
+/// some files even from rename-within-parent), the error propagates so
+/// the caller's later copy surfaces the real failure with its path.
+///
+/// No-op on non-macOS targets or when the path is missing.
+pub fn evict_locked_file(path: &Path) -> Result<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        if !has_provenance_lock(path) {
+            return Ok(false);
+        }
+        let parent = path.parent().ok_or_else(|| CleenError::IoError {
+            message: format!("file has no parent: {}", path.display()),
+        })?;
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let graveyard = parent.join(format!(".{file_name}.locked-{ts}"));
+
+        std::fs::rename(path, &graveyard).map_err(|e| CleenError::IoError {
+            message: format!(
+                "could not evict provenance-locked file {}: {e}",
+                path.display()
+            ),
+        })?;
+        Ok(true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        Ok(false)
+    }
+}
+
+/// Remove whatever is at `path`, falling back to provenance-lock
+/// eviction if a plain remove is rejected with EPERM. Use this on the
+/// destination of any copy/symlink that must succeed even when the
+/// existing file carries `com.apple.provenance`.
+pub fn force_remove_path(path: &Path) -> Result<()> {
+    match remove_path_if_exists(path) {
+        Ok(()) => Ok(()),
+        Err(CleenError::PermissionDenied { .. }) => {
+            if evict_locked_file(path)? {
+                Ok(())
+            } else {
+                Err(CleenError::PermissionDenied {
+                    path: path.to_path_buf(),
+                })
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// Evict provenance-locked regular files out of `bin_dir` by shuffling
 /// the directory in place. Returns `Ok(true)` if a shuffle ran.
 ///
@@ -506,6 +662,110 @@ mod tests {
             })
             .collect();
         assert!(leftovers.is_empty(), "found leftover temp symlinks");
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn evict_locked_dir_noops_on_unlocked_dir() {
+        // On non-macOS hosts `com.apple.provenance` does not exist and the
+        // helper is a no-op for any directory. macOS Sequoia is excluded
+        // because the kernel pins the xattr onto every file written by the
+        // test binary and refuses xattr clear — there is no way to stage an
+        // "unlocked" file under test on that host.
+        let tmp = std::env::temp_dir().join(format!("cleen-fs-evict-noop-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let dir = tmp.join("ver");
+        fs::create_dir_all(&dir).unwrap();
+        let inner = dir.join("plugin.wasm");
+        fs::write(&inner, b"hello").unwrap();
+
+        let evicted = evict_locked_dir(&dir).unwrap();
+        assert!(!evicted, "should not evict an unlocked dir");
+        assert!(dir.exists(), "original dir must still be in place");
+        assert_eq!(fs::read(&inner).unwrap(), b"hello");
+
+        let siblings: Vec<_> = fs::read_dir(&tmp)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with("ver.locked-"))
+            .collect();
+        assert!(siblings.is_empty(), "no graveyards expected");
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn evict_locked_dir_renames_locked_version_dir_on_macos() {
+        // macOS Sequoia stamps `com.apple.provenance` onto every file the
+        // test binary writes (the lock is inherited from the binary that
+        // launched the process). That is exactly the production scenario:
+        // a previous `cleen frame install` leaves locked files under
+        // `~/.cleen/plugins/<name>/<ver>/`, and the next install needs the
+        // version dir freshly available. Verify the helper detects the
+        // lock, renames the dir to `<ver>.locked-<ts>`, and frees the
+        // original path for `create_dir_all`.
+        let tmp = std::env::temp_dir().join(format!("cleen-fs-evict-macos-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let dir = tmp.join("2.1.4");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("plugin.wasm"), b"old").unwrap();
+
+        assert!(dir_has_provenance_lock(&dir), "test setup precondition");
+
+        let evicted = evict_locked_dir(&dir).unwrap();
+        assert!(evicted, "macOS test write should have been locked");
+        assert!(
+            !dir.exists(),
+            "original path must be freed for the new write"
+        );
+
+        let graveyards: Vec<_> = fs::read_dir(&tmp)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with("2.1.4.locked-"))
+            .collect();
+        assert_eq!(graveyards.len(), 1, "exactly one graveyard expected");
+
+        // The original path is now usable for a fresh install.
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("plugin.wasm"), b"new").unwrap();
+        assert_eq!(fs::read(dir.join("plugin.wasm")).unwrap(), b"new");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn evict_locked_dir_noops_on_missing_dir() {
+        // Caller passes the planned destination unconditionally; it may not
+        // exist on a first install. Must not error.
+        let tmp =
+            std::env::temp_dir().join(format!("cleen-fs-evict-missing-{}", std::process::id()));
+        let missing = tmp.join("does-not-exist");
+        assert!(!evict_locked_dir(&missing).unwrap());
+    }
+
+    #[test]
+    fn force_remove_path_removes_unlocked_file() {
+        let tmp =
+            std::env::temp_dir().join(format!("cleen-fs-force-remove-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let f = tmp.join("plugin.wasm");
+        fs::write(&f, b"x").unwrap();
+
+        force_remove_path(&f).unwrap();
+        assert!(!f.exists());
+
+        // Idempotent: second call against a missing path is a no-op.
+        force_remove_path(&f).unwrap();
 
         fs::remove_dir_all(&tmp).unwrap();
     }

@@ -189,22 +189,31 @@ pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) 
         let file_name = entry.file_name();
         let dst_path = plugin_dir.join(&file_name);
 
-        // Clear whatever is at dst first — including dangling symlinks. Using
-        // `exists()` here would silently skip broken links and the next
-        // `create_dir_all` / `copy` would fail with EEXIST.
-        fs_utils::remove_path_if_exists(&dst_path)?;
+        // Clear whatever is at dst first — including dangling symlinks and
+        // files carrying `com.apple.provenance`. Using bare `exists()` would
+        // silently skip broken links and the next `create_dir_all` / `copy`
+        // would fail with EEXIST; `force_remove_path` additionally falls back
+        // to renaming a provenance-locked file out of the way so the copy
+        // below can land. Sibling versioned subdirectories under
+        // `plugin_dir` are untouched.
+        fs_utils::force_remove_path(&dst_path)?;
 
         if src_path.is_dir() {
             fs_utils::copy_dir_recursive(&src_path, &dst_path)?;
         } else {
-            fs::copy(&src_path, &dst_path)?;
+            fs::copy(&src_path, &dst_path).map_err(|e| crate::error::CleenError::IoError {
+                message: format!("could not activate plugin file {}: {e}", dst_path.display()),
+            })?;
         }
     }
 
     // Write .active-version marker file via atomic rename — the previous
     // marker may carry inherited `com.apple.provenance` that would block
-    // in-place mutation on macOS Sequoia.
+    // in-place mutation on macOS Sequoia. If the marker is locked,
+    // `atomic_write`'s rename-over fails with EPERM; evict the locked
+    // file out of the way first so the rename targets a clean inode.
     let active_version_path = plugin_dir.join(".active-version");
+    fs_utils::evict_locked_file(&active_version_path)?;
     fs_utils::atomic_write(&active_version_path, version.as_bytes(), None)?;
 
     Ok(())

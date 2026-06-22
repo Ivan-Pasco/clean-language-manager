@@ -248,7 +248,15 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             installed_plugin_names.push(plugin_name.clone());
 
             // Create versioned subdirectory: ~/.cleen/plugins/<plugin>/<version>/
+            //
+            // If the destination already holds files inherited from a previous
+            // install that carry `com.apple.provenance`, the in-place overwrite
+            // below would fail with EPERM ("Operation not permitted") and abort
+            // the entire frame install — leaving every plugin later in the loop
+            // uninstalled. Evict the locked version dir wholesale to a sibling
+            // graveyard so the fresh copy lands on a clean inode.
             let version_dest = plugins_dir.join(&plugin_name).join(&plugin_version);
+            crate::utils::fs::evict_locked_dir(&version_dest)?;
             std::fs::create_dir_all(&version_dest)?;
 
             // Move all files from the extracted plugin directory into the versioned directory
@@ -260,11 +268,18 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
                 if file_src.is_dir() {
                     if file_dst.exists() {
-                        std::fs::remove_dir_all(&file_dst)?;
+                        std::fs::remove_dir_all(&file_dst).map_err(|e| CleenError::IoError {
+                            message: format!(
+                                "could not remove existing plugin dir {}: {e}",
+                                file_dst.display()
+                            ),
+                        })?;
                     }
                     crate::utils::fs::copy_dir_recursive(&file_src, &file_dst)?;
                 } else {
-                    std::fs::copy(&file_src, &file_dst)?;
+                    std::fs::copy(&file_src, &file_dst).map_err(|e| CleenError::IoError {
+                        message: format!("could not write plugin file {}: {e}", file_dst.display()),
+                    })?;
                 }
             }
 
