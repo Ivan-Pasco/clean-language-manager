@@ -64,7 +64,9 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<()> {
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     ensure_dir_exists(dst)?;
 
-    for entry in std::fs::read_dir(src)? {
+    for entry in std::fs::read_dir(src).map_err(|e| CleenError::IoError {
+        message: format!("could not list source dir {}: {e}", src.display()),
+    })? {
         let entry = entry?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
@@ -72,7 +74,13 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         if src_path.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
-            std::fs::copy(&src_path, &dst_path)?;
+            std::fs::copy(&src_path, &dst_path).map_err(|e| CleenError::IoError {
+                message: format!(
+                    "could not copy {} to {}: {e}",
+                    src_path.display(),
+                    dst_path.display()
+                ),
+            })?;
         }
     }
 
@@ -229,6 +237,40 @@ pub fn has_provenance_lock(path: &Path) -> bool {
     }
 }
 
+/// True if the directory `path` itself carries `com.apple.provenance`
+/// (independently of files inside it).
+///
+/// A locked dir entry on macOS Sequoia rejects creation of new entries
+/// inside it — `create_dir`, `create_dir_all` on a child, and any write
+/// that would add a new file all fail with EPERM, even though existing
+/// children may be read normally. This is distinct from
+/// [`has_provenance_lock`] (which only inspects regular files) and from
+/// [`dir_has_provenance_lock`] (which walks the dir for locked files).
+/// Always false on non-macOS targets.
+pub fn dir_entry_has_provenance_lock(path: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let Ok(meta) = std::fs::symlink_metadata(path) else {
+            return false;
+        };
+        if !meta.file_type().is_dir() {
+            return false;
+        }
+        std::process::Command::new("/usr/bin/xattr")
+            .arg("-p")
+            .arg("com.apple.provenance")
+            .arg(path)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        false
+    }
+}
+
 /// Atomically replace `path` with a symlink pointing at `target`.
 ///
 /// The symlink is created at a sibling temp name and renamed over the
@@ -318,10 +360,15 @@ pub fn evict_locked_dir(dir: &Path) -> Result<bool> {
             message: format!("dir has no parent: {}", dir.display()),
         })?;
         let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("locked");
+        // Nanos + pid so back-to-back evictions in the same second (a
+        // single install can hit both `evict_locked_plugin_root` then
+        // `evict_locked_dir` then activate's `evict_locked_plugin_root`
+        // again on the same root) do not collide on the graveyard name.
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
+            .map(|d| d.as_nanos())
             .unwrap_or(0);
+        let ts = format!("{ts}-{}", std::process::id());
         let graveyard = parent.join(format!("{dir_name}.locked-{ts}"));
 
         std::fs::rename(dir, &graveyard).map_err(|e| CleenError::IoError {
@@ -340,6 +387,129 @@ pub fn evict_locked_dir(dir: &Path) -> Result<bool> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = dir;
+        Ok(false)
+    }
+}
+
+/// Evict a plugin root directory while preserving its versioned
+/// subdirectories on the fresh path. Returns `Ok(true)` if a shuffle ran.
+///
+/// The plugin root at `~/.cleen/plugins/<name>/` is a hybrid of
+/// activation copy (root-level files like `plugin.wasm`, `plugin.toml`,
+/// `.active-version`) and versioned history (`<name>/<ver>/`
+/// subdirectories, each carrying its own `plugin.toml`). When the
+/// activation-copy files carry `com.apple.provenance`, individual file
+/// eviction inside the root is rejected by the kernel even when
+/// subdirectory rename within that same root still works — and
+/// [`atomic_write`]'s rename-replace fails on the same lock. The escape
+/// is to rename the whole root away (versioned subdirs go with it),
+/// recreate it fresh, and rename the version subdirs back into place
+/// from the graveyard.
+///
+/// Renaming a version subdir back into the new root within the same
+/// parent succeeds because the dir-entry rename is what the kernel
+/// allows (the file-leaf lock does not extend to sub-trees), and it is
+/// faster and avoids inheriting the lock onto new copies. If the
+/// rename-back fails for a specific version, it is left in the
+/// graveyard and a warning is printed — the user can recover it
+/// manually.
+///
+/// No-op on non-macOS targets or when the root is missing or unlocked.
+pub fn evict_locked_plugin_root(root: &Path) -> Result<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        if !root.exists() {
+            return Ok(false);
+        }
+        // Two triggers:
+        //   (a) a locked root file (blocks rename-over for `.active-version`
+        //       and the activation copies), and
+        //   (b) a locked dir entry on the root itself (blocks creation of
+        //       new subdirs underneath, which is what fails for a brand-new
+        //       version like `frame.ui/2.12.25`).
+        // Either one breaks install and is fixed by the same shuffle.
+        let dir_entry_locked = dir_entry_has_provenance_lock(root);
+        let entries: Vec<_> = std::fs::read_dir(root)?.flatten().collect();
+        let mut has_locked_root_file = false;
+        for entry in &entries {
+            let path = entry.path();
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if meta.file_type().is_file() && has_provenance_lock(&path) {
+                has_locked_root_file = true;
+                break;
+            }
+        }
+        if !dir_entry_locked && !has_locked_root_file {
+            return Ok(false);
+        }
+
+        // Collect version subdir names (those containing plugin.toml) so
+        // we know what to rename back after creating the fresh root.
+        let mut version_subdirs: Vec<std::ffi::OsString> = Vec::new();
+        for entry in &entries {
+            let path = entry.path();
+            if path.is_dir() && path.join("plugin.toml").exists() {
+                version_subdirs.push(entry.file_name());
+            }
+        }
+
+        let parent = root.parent().ok_or_else(|| CleenError::IoError {
+            message: format!("root has no parent: {}", root.display()),
+        })?;
+        let root_name = root
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("locked");
+        // Nanos + pid so back-to-back evictions in the same second (a
+        // single install can hit both `evict_locked_plugin_root` then
+        // `evict_locked_dir` then activate's `evict_locked_plugin_root`
+        // again on the same root) do not collide on the graveyard name.
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let ts = format!("{ts}-{}", std::process::id());
+        let graveyard = parent.join(format!("{root_name}.locked-{ts}"));
+
+        std::fs::rename(root, &graveyard).map_err(|e| CleenError::IoError {
+            message: format!(
+                "could not evict provenance-locked plugin root {}: {e}",
+                root.display()
+            ),
+        })?;
+        std::fs::create_dir_all(root)?;
+
+        // Rename each preserved version subdir from the graveyard back
+        // into the fresh root. Best-effort: if a specific version's
+        // rename fails (rare; would require an even stricter lock than
+        // we've seen), leave it in the graveyard with a warning so the
+        // user can recover the data manually.
+        for name in &version_subdirs {
+            let from = graveyard.join(name);
+            let to = root.join(name);
+            if let Err(e) = std::fs::rename(&from, &to) {
+                eprintln!(
+                    "  Warning: could not restore version {} into fresh plugin root: {} \
+                     (left at {})",
+                    name.to_string_lossy(),
+                    e,
+                    from.display()
+                );
+            }
+        }
+
+        eprintln!(
+            "  Evicted provenance-locked plugin root — activation files removed, {} preserved version(s) restored, graveyard at {}",
+            version_subdirs.len(),
+            graveyard.display()
+        );
+        Ok(true)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = root;
         Ok(false)
     }
 }
@@ -368,10 +538,15 @@ pub fn evict_locked_file(path: &Path) -> Result<bool> {
             message: format!("file has no parent: {}", path.display()),
         })?;
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+        // Nanos + pid so back-to-back evictions in the same second (a
+        // single install can hit both `evict_locked_plugin_root` then
+        // `evict_locked_dir` then activate's `evict_locked_plugin_root`
+        // again on the same root) do not collide on the graveyard name.
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
+            .map(|d| d.as_nanos())
             .unwrap_or(0);
+        let ts = format!("{ts}-{}", std::process::id());
         let graveyard = parent.join(format!(".{file_name}.locked-{ts}"));
 
         std::fs::rename(path, &graveyard).map_err(|e| CleenError::IoError {
@@ -439,10 +614,15 @@ pub fn evict_locked_shims(bin_dir: &Path, names: &[&str]) -> Result<bool> {
             .and_then(|n| n.to_str())
             .unwrap_or("bin");
 
+        // Nanos + pid so back-to-back evictions in the same second (a
+        // single install can hit both `evict_locked_plugin_root` then
+        // `evict_locked_dir` then activate's `evict_locked_plugin_root`
+        // again on the same root) do not collide on the graveyard name.
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
+            .map(|d| d.as_nanos())
             .unwrap_or(0);
+        let ts = format!("{ts}-{}", std::process::id());
         let staging = parent.join(format!("{bin_name}.new.{}", std::process::id()));
         let graveyard = parent.join(format!("{bin_name}.locked-{ts}"));
 

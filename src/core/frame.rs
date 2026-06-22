@@ -190,6 +190,13 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         let mut config = Config::load()?;
         let mut installed_plugin_names: Vec<String> = Vec::new();
         let mut incompatible_plugins: Vec<(String, String, String, String)> = Vec::new();
+        // Plugin name -> reason it failed to install. Used to keep the
+        // overall install alive when an individual plugin hits an
+        // unevictable kernel pin (e.g. a fully-locked plugin root on
+        // macOS Sequoia where even sibling rename is rejected). Without
+        // this, one bad plugin would abort the entire frame install and
+        // every plugin later in iteration order would never land.
+        let mut failed_plugins: Vec<(String, String)> = Vec::new();
         for entry in std::fs::read_dir(&staging_dir)? {
             let entry = entry?;
             let src_path = entry.path();
@@ -245,53 +252,81 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 (folder_name.clone(), frame_version.clone())
             };
 
-            installed_plugin_names.push(plugin_name.clone());
+            // Install this plugin in a closure so a fatal error on one
+            // plugin (e.g. an unevictable kernel pin on its root dir
+            // entry) does not abort the whole frame install — the
+            // remaining plugins still land. The failure is recorded and
+            // surfaced as a warning at the end.
+            let install_one = || -> Result<()> {
+                // Evict the plugin root upfront when its own dir entry
+                // carries `com.apple.provenance` — that lock rejects
+                // creation of new child entries (the next
+                // `create_dir_all` would fail with EPERM for any
+                // brand-new version like a fresh `2.12.25`). The helper
+                // preserves existing versioned subdirs via rename-back.
+                // No-op when the root is clean.
+                let plugin_root = plugins_dir.join(&plugin_name);
+                crate::utils::fs::evict_locked_plugin_root(&plugin_root)?;
 
-            // Create versioned subdirectory: ~/.cleen/plugins/<plugin>/<version>/
-            //
-            // If the destination already holds files inherited from a previous
-            // install that carry `com.apple.provenance`, the in-place overwrite
-            // below would fail with EPERM ("Operation not permitted") and abort
-            // the entire frame install — leaving every plugin later in the loop
-            // uninstalled. Evict the locked version dir wholesale to a sibling
-            // graveyard so the fresh copy lands on a clean inode.
-            let version_dest = plugins_dir.join(&plugin_name).join(&plugin_version);
-            crate::utils::fs::evict_locked_dir(&version_dest)?;
-            std::fs::create_dir_all(&version_dest)?;
+                // Create versioned subdirectory:
+                // ~/.cleen/plugins/<plugin>/<version>/. If the
+                // destination already holds files inherited from a
+                // previous install that carry `com.apple.provenance`,
+                // evict the locked version dir to a sibling graveyard
+                // so the fresh copy lands on a clean inode.
+                let version_dest = plugin_root.join(&plugin_version);
+                crate::utils::fs::evict_locked_dir(&version_dest)?;
+                std::fs::create_dir_all(&version_dest).map_err(|e| CleenError::IoError {
+                    message: format!(
+                        "could not create plugin version dir {}: {e}",
+                        version_dest.display()
+                    ),
+                })?;
 
-            // Move all files from the extracted plugin directory into the versioned directory
-            for file_entry in std::fs::read_dir(&src_path)? {
-                let file_entry = file_entry?;
-                let file_src = file_entry.path();
-                let file_name = file_entry.file_name();
-                let file_dst = version_dest.join(&file_name);
+                for file_entry in std::fs::read_dir(&src_path)? {
+                    let file_entry = file_entry?;
+                    let file_src = file_entry.path();
+                    let file_name = file_entry.file_name();
+                    let file_dst = version_dest.join(&file_name);
 
-                if file_src.is_dir() {
-                    if file_dst.exists() {
-                        std::fs::remove_dir_all(&file_dst).map_err(|e| CleenError::IoError {
+                    if file_src.is_dir() {
+                        if file_dst.exists() {
+                            std::fs::remove_dir_all(&file_dst).map_err(|e| {
+                                CleenError::IoError {
+                                    message: format!(
+                                        "could not remove existing plugin dir {}: {e}",
+                                        file_dst.display()
+                                    ),
+                                }
+                            })?;
+                        }
+                        crate::utils::fs::copy_dir_recursive(&file_src, &file_dst)?;
+                    } else {
+                        std::fs::copy(&file_src, &file_dst).map_err(|e| CleenError::IoError {
                             message: format!(
-                                "could not remove existing plugin dir {}: {e}",
+                                "could not write plugin file {}: {e}",
                                 file_dst.display()
                             ),
                         })?;
                     }
-                    crate::utils::fs::copy_dir_recursive(&file_src, &file_dst)?;
-                } else {
-                    std::fs::copy(&file_src, &file_dst).map_err(|e| CleenError::IoError {
-                        message: format!("could not write plugin file {}: {e}", file_dst.display()),
-                    })?;
+                }
+
+                crate::plugin::activate_plugin_version_root(&config, &plugin_name, &plugin_version)
+            };
+
+            match install_one() {
+                Ok(()) => {
+                    installed_plugin_names.push(plugin_name.clone());
+                    config
+                        .active_plugins
+                        .insert(plugin_name.clone(), plugin_version.clone());
+                    println!("  Installed {plugin_name} v{plugin_version}");
+                }
+                Err(e) => {
+                    eprintln!("  Failed to install {plugin_name} v{plugin_version}: {e}");
+                    failed_plugins.push((plugin_name.clone(), e.to_string()));
                 }
             }
-
-            // Activate this version: copy files to plugin root and write .active-version
-            crate::plugin::activate_plugin_version_root(&config, &plugin_name, &plugin_version)?;
-
-            // Update config with active plugin version
-            config
-                .active_plugins
-                .insert(plugin_name.clone(), plugin_version.clone());
-
-            println!("  Installed {plugin_name} v{plugin_version}");
         }
 
         // Clean up known renamed plugin folders.
@@ -309,12 +344,27 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             }
         }
 
-        // Mark the version as installed in frame-versions dir
-        std::fs::create_dir_all(&version_dir)?;
+        // Mark the version as installed in frame-versions dir.
+        // The marker file may carry inherited `com.apple.provenance` from a
+        // prior install — evict it before writing so the rename can land.
+        std::fs::create_dir_all(&version_dir).map_err(|e| CleenError::IoError {
+            message: format!(
+                "could not create frame version dir {}: {e}",
+                version_dir.display()
+            ),
+        })?;
+        let installed_marker = version_dir.join(".installed");
+        crate::utils::fs::evict_locked_file(&installed_marker)?;
         std::fs::write(
-            version_dir.join(".installed"),
+            &installed_marker,
             format!("plugins-only: {frame_version}\n"),
-        )?;
+        )
+        .map_err(|e| CleenError::IoError {
+            message: format!(
+                "could not write frame install marker {}: {e}",
+                installed_marker.display()
+            ),
+        })?;
 
         // Plugin files were copied (not atomically replaced) into per-plugin
         // version dirs and the activation root. Strip macOS provenance so the
@@ -330,6 +380,19 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
         println!("Successfully installed Frame plugins version {frame_version}");
         println!("   Plugins location: {}", plugins_dir.display());
+
+        if !failed_plugins.is_empty() {
+            eprintln!();
+            eprintln!("⚠️  Plugins that failed to install (other plugins succeeded):");
+            for (name, reason) in &failed_plugins {
+                eprintln!("   • {name}: {reason}");
+            }
+            eprintln!();
+            eprintln!("   The most common cause on macOS Sequoia is an unevictable");
+            eprintln!("   kernel pin on the plugin root dir entry. Remove it manually:");
+            eprintln!("     rm -rf ~/.cleen/plugins/<name>");
+            eprintln!("   then re-run `cleen frame install latest`.");
+        }
 
         if !incompatible_plugins.is_empty() {
             eprintln!();

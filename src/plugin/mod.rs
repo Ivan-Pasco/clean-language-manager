@@ -182,6 +182,15 @@ pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) 
         });
     }
 
+    // If the plugin root holds activation files carrying
+    // `com.apple.provenance`, eviction of individual root entries is
+    // rejected by the kernel even when subdir-rename within the root
+    // still works (the leaf-file lock is stricter than the dir-entry
+    // lock). The escape is to rename the whole root away — versioned
+    // subdirs go with it — recreate it fresh, and rename the version
+    // subdirs back into place. This is a no-op when the root is clean.
+    fs_utils::evict_locked_plugin_root(&plugin_dir)?;
+
     // Copy all files from the version directory to the plugin root
     for entry in fs::read_dir(&version_dir)? {
         let entry = entry?;
