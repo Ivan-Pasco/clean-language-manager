@@ -666,77 +666,60 @@ mod tests {
         fs::remove_dir_all(&tmp).unwrap();
     }
 
-    #[cfg(not(target_os = "macos"))]
     #[test]
-    fn evict_locked_dir_noops_on_unlocked_dir() {
-        // On non-macOS hosts `com.apple.provenance` does not exist and the
-        // helper is a no-op for any directory. macOS Sequoia is excluded
-        // because the kernel pins the xattr onto every file written by the
-        // test binary and refuses xattr clear — there is no way to stage an
-        // "unlocked" file under test on that host.
-        let tmp = std::env::temp_dir().join(format!("cleen-fs-evict-noop-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&tmp);
-        fs::create_dir_all(&tmp).unwrap();
-
-        let dir = tmp.join("ver");
-        fs::create_dir_all(&dir).unwrap();
-        let inner = dir.join("plugin.wasm");
-        fs::write(&inner, b"hello").unwrap();
-
-        let evicted = evict_locked_dir(&dir).unwrap();
-        assert!(!evicted, "should not evict an unlocked dir");
-        assert!(dir.exists(), "original dir must still be in place");
-        assert_eq!(fs::read(&inner).unwrap(), b"hello");
-
-        let siblings: Vec<_> = fs::read_dir(&tmp)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("ver.locked-"))
-            .collect();
-        assert!(siblings.is_empty(), "no graveyards expected");
-
-        fs::remove_dir_all(&tmp).unwrap();
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn evict_locked_dir_renames_locked_version_dir_on_macos() {
-        // macOS Sequoia stamps `com.apple.provenance` onto every file the
-        // test binary writes (the lock is inherited from the binary that
-        // launched the process). That is exactly the production scenario:
-        // a previous `cleen frame install` leaves locked files under
-        // `~/.cleen/plugins/<name>/<ver>/`, and the next install needs the
-        // version dir freshly available. Verify the helper detects the
-        // lock, renames the dir to `<ver>.locked-<ts>`, and frees the
-        // original path for `create_dir_all`.
-        let tmp = std::env::temp_dir().join(format!("cleen-fs-evict-macos-{}", std::process::id()));
+    fn evict_locked_dir_behavior_matches_host_lock_state() {
+        // The branch we can exercise depends on the host:
+        //   - non-macOS: no provenance xattr exists → helper no-ops.
+        //   - macOS without inherited lock (e.g. GitHub Actions runner,
+        //     macOS pre-Sequoia, or Sequoia where the launching binary did
+        //     not carry the xattr) → helper no-ops.
+        //   - macOS Sequoia with inherited lock (typical developer host
+        //     where `cleen` was installed via curl|sh) → helper evicts.
+        // Detect actual lock state at runtime rather than guessing from
+        // `cfg(target_os = "macos")` — that mismatch is what failed CI on
+        // the macos-latest runner.
+        let tmp = std::env::temp_dir().join(format!("cleen-fs-evict-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
         let dir = tmp.join("2.1.4");
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("plugin.wasm"), b"old").unwrap();
+        let inner = dir.join("plugin.wasm");
+        fs::write(&inner, b"old").unwrap();
 
-        assert!(dir_has_provenance_lock(&dir), "test setup precondition");
-
+        let was_locked = dir_has_provenance_lock(&dir);
         let evicted = evict_locked_dir(&dir).unwrap();
-        assert!(evicted, "macOS test write should have been locked");
-        assert!(
-            !dir.exists(),
-            "original path must be freed for the new write"
+        assert_eq!(
+            evicted, was_locked,
+            "evict must run exactly when a lock was detected"
         );
 
-        let graveyards: Vec<_> = fs::read_dir(&tmp)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("2.1.4.locked-"))
-            .collect();
-        assert_eq!(graveyards.len(), 1, "exactly one graveyard expected");
+        if was_locked {
+            // Production scenario: original path freed, content preserved
+            // in a single sibling graveyard, and the original path is
+            // immediately reusable for a fresh install.
+            assert!(!dir.exists(), "original path must be freed");
+            let graveyards: Vec<_> = fs::read_dir(&tmp)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_name().to_string_lossy().starts_with("2.1.4.locked-"))
+                .collect();
+            assert_eq!(graveyards.len(), 1, "exactly one graveyard expected");
 
-        // The original path is now usable for a fresh install.
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("plugin.wasm"), b"new").unwrap();
-        assert_eq!(fs::read(dir.join("plugin.wasm")).unwrap(), b"new");
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("plugin.wasm"), b"new").unwrap();
+            assert_eq!(fs::read(dir.join("plugin.wasm")).unwrap(), b"new");
+        } else {
+            // No-op path: dir untouched, content intact, no graveyard.
+            assert!(dir.exists(), "original dir must still be in place");
+            assert_eq!(fs::read(&inner).unwrap(), b"old");
+            let siblings: Vec<_> = fs::read_dir(&tmp)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_name().to_string_lossy().starts_with("2.1.4.locked-"))
+                .collect();
+            assert!(siblings.is_empty(), "no graveyards expected");
+        }
 
         let _ = fs::remove_dir_all(&tmp);
     }
