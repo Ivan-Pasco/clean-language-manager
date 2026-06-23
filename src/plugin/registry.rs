@@ -144,8 +144,7 @@ fn download_and_install_plugin(config: &mut Config, info: &PluginInfo) -> Result
         // TODO: Implement checksum verification
     }
 
-    // Set as active version and activate root-level files
-    config.set_active_plugin(&info.name, &info.version)?;
+    // Activation writes `.active-version` — the single source of truth.
     activate_plugin_version_root(config, &info.name, &info.version)?;
 
     println!(
@@ -189,8 +188,7 @@ pub fn install_from_local(config: &mut Config, source_dir: &Path) -> Result<()> 
     fs::copy(&manifest_path, &target_manifest)?;
     fs::copy(&wasm_source, &target_wasm)?;
 
-    // Set as active version and activate root-level files
-    config.set_active_plugin(name, version)?;
+    // Activation writes `.active-version` — the single source of truth.
     activate_plugin_version_root(config, name, version)?;
 
     println!("Plugin {}@{} installed successfully", name, version);

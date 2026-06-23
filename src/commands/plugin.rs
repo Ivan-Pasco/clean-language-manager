@@ -1,4 +1,4 @@
-use crate::core::config::Config;
+use crate::core::config::{read_active_version, Config};
 use crate::error::{CleenError, Result};
 use crate::plugin::manifest::PluginManifest;
 use crate::plugin::registry;
@@ -64,8 +64,8 @@ pub fn list_plugins() -> Result<()> {
             current_name = plugin.name.clone();
         }
 
-        let active = config.get_active_plugin_version(&plugin.name);
-        let marker = if active == Some(&plugin.version) {
+        let active = read_active_version(&config, &plugin.name);
+        let marker = if active.as_deref() == Some(plugin.version.as_str()) {
             "* "
         } else {
             "  "
@@ -209,7 +209,7 @@ pub fn publish_plugin() -> Result<()> {
 
 /// Remove a plugin
 pub fn remove_plugin_command(name: &str) -> Result<()> {
-    let mut config = Config::load()?;
+    let config = Config::load()?;
 
     // Check if plugin exists
     let plugin_dir = config.get_plugin_dir(name);
@@ -221,7 +221,7 @@ pub fn remove_plugin_command(name: &str) -> Result<()> {
 
     println!("Removing {}...", name);
 
-    remove_plugin(&mut config, name)?;
+    remove_plugin(&config, name)?;
 
     println!("Removed {}", plugin_dir.display());
     println!("Plugin {} removed successfully", name);
@@ -231,7 +231,7 @@ pub fn remove_plugin_command(name: &str) -> Result<()> {
 
 /// Use a specific version of a plugin
 pub fn use_plugin_version(name: &str, version: &str) -> Result<()> {
-    let mut config = Config::load()?;
+    let config = Config::load()?;
 
     // Check if version is installed
     if !is_plugin_installed(&config, name, version) {
@@ -255,7 +255,9 @@ pub fn use_plugin_version(name: &str, version: &str) -> Result<()> {
         }
     }
 
-    config.set_active_plugin(name, version)?;
+    // `activate_plugin_version_root` writes `.active-version` — the single
+    // source of truth for plugin pins (see HOST_BRIDGE.md "Plugin Pin
+    // Resolution").
     activate_plugin_version_root(&config, name, version)?;
 
     println!("Now using {} version {}", name, version);

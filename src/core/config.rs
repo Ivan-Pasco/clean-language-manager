@@ -4,8 +4,12 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::PathBuf;
 
-use std::collections::HashMap;
-
+// Note: the legacy `active_plugins` map was removed. `.active-version`
+// files under each plugin dir are now the single source of truth (see
+// HOST_BRIDGE.md "Plugin Pin Resolution"). Serde's default behavior
+// silently ignores unknown fields on deserialize, so existing
+// `config.json` files carrying the old map still load cleanly and will
+// be rewritten without it on the next save.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub active_version: Option<String>,
@@ -22,9 +26,6 @@ pub struct Config {
     pub auto_offer_frame: bool,
     pub last_update_check: Option<String>,
     pub last_self_update_check: Option<String>,
-    /// Active plugin versions: plugin_name -> version
-    #[serde(default)]
-    pub active_plugins: HashMap<String, String>,
 }
 
 fn default_true() -> bool {
@@ -46,7 +47,6 @@ impl Default for Config {
             auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
-            active_plugins: HashMap::new(),
         }
     }
 }
@@ -66,7 +66,6 @@ impl Config {
             auto_offer_frame: true,
             last_update_check: None,
             last_self_update_check: None,
-            active_plugins: HashMap::new(),
         })
     }
 
@@ -338,24 +337,33 @@ impl Config {
         self.get_plugin_version_dir(name, version)
             .join("plugin.wasm")
     }
+}
 
-    /// Set the active version for a plugin
-    pub fn set_active_plugin(&mut self, name: &str, version: &str) -> Result<()> {
-        self.active_plugins
-            .insert(name.to_string(), version.to_string());
-        self.save()
+/// Resolve a plugin's active version by reading `<plugins_dir>/<name>/.active-version`.
+///
+/// Returns `Some(V)` only when the marker file exists, contains a non-empty
+/// trimmed string `V`, and `<name>/V/plugin.wasm` exists on disk. Returns
+/// `None` for missing or empty markers, and treats stale "ghost" pins
+/// (marker points at a directory without `plugin.wasm`) as `None` so that
+/// callers fall through to a sane default rather than acting on bad state.
+///
+/// This mirrors the compiler's resolver in `WasmLoader::find_plugin_dir`
+/// (`clean-language-compiler/src/plugins/wasm_loader.rs`) and is the only
+/// supported way to read plugin pins. See `HOST_BRIDGE.md`
+/// "Plugin Pin Resolution" for the contract.
+pub fn read_active_version(config: &Config, name: &str) -> Option<String> {
+    let plugin_dir = config.get_plugin_dir(name);
+    let marker = plugin_dir.join(".active-version");
+    let content = std::fs::read_to_string(&marker).ok()?;
+    let version = content.trim().to_string();
+    if version.is_empty() {
+        return None;
     }
-
-    /// Remove a plugin from the active plugins
-    pub fn remove_active_plugin(&mut self, name: &str) -> Result<()> {
-        self.active_plugins.remove(name);
-        self.save()
+    let wasm = plugin_dir.join(&version).join("plugin.wasm");
+    if !wasm.exists() {
+        return None;
     }
-
-    /// Get the active version for a plugin
-    pub fn get_active_plugin_version(&self, name: &str) -> Option<&String> {
-        self.active_plugins.get(name)
-    }
+    Some(version)
 }
 
 fn get_cleen_dir() -> Result<PathBuf> {

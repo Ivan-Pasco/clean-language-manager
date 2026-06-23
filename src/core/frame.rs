@@ -1,5 +1,6 @@
 use crate::core::{compatibility, config::Config, download::Downloader, github::GitHubClient};
 use crate::error::{CleenError, Result};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -10,6 +11,64 @@ fn get_pid_file_path() -> PathBuf {
 
 const FRAME_REPO_OWNER: &str = "Ivan-Pasco";
 const FRAME_REPO_NAME: &str = "cleen-framework";
+
+/// Filename for the per-frame-version manifest that records which plugin
+/// versions belong to a given meta-bundle. Lives at
+/// `~/.cleen/versions/frame/<frame_version>/plugins.json` as a flat map of
+/// `plugin_name -> plugin_version`. Used by `use_frame_version`,
+/// `uninstall_frame_version`, and the install re-entry path to re-assert
+/// per-plugin `.active-version` pins — the single source of truth for
+/// runtime plugin selection (see HOST_BRIDGE.md "Plugin Pin Resolution").
+const FRAME_PLUGINS_MANIFEST: &str = "plugins.json";
+
+/// Write the plugin manifest for a frame meta-bundle.
+fn write_frame_plugins_manifest(
+    version_dir: &Path,
+    plugins: &BTreeMap<String, String>,
+) -> Result<()> {
+    let path = version_dir.join(FRAME_PLUGINS_MANIFEST);
+    let content = serde_json::to_string_pretty(plugins).map_err(|e| CleenError::IoError {
+        message: format!("could not serialize frame plugins manifest: {e}"),
+    })?;
+    // The manifest may already exist from a previous install and carry
+    // `com.apple.provenance`; the eviction matches the pattern used for
+    // sibling files in this module.
+    crate::utils::fs::evict_locked_file(&path)?;
+    crate::utils::fs::atomic_write(&path, content.as_bytes(), None)?;
+    Ok(())
+}
+
+/// Read the plugin manifest for an installed frame meta-bundle. Returns an
+/// empty map when the manifest is missing — older installs predate it and
+/// will simply skip the re-pin step.
+fn read_frame_plugins_manifest(version_dir: &Path) -> BTreeMap<String, String> {
+    let path = version_dir.join(FRAME_PLUGINS_MANIFEST);
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return BTreeMap::new();
+    };
+    serde_json::from_str(&content).unwrap_or_default()
+}
+
+/// Re-assert every per-plugin `.active-version` recorded in the frame
+/// meta-bundle's manifest. Returns the list of `(plugin, version)` entries
+/// the manifest expected but which are not present on disk so callers can
+/// surface a single combined error rather than aborting on the first miss.
+fn reactivate_frame_plugins(
+    config: &Config,
+    frame_version: &str,
+) -> Result<Vec<(String, String)>> {
+    let version_dir = get_frame_version_dir(config, frame_version);
+    let manifest = read_frame_plugins_manifest(&version_dir);
+    let mut missing = Vec::new();
+    for (plugin_name, plugin_version) in manifest {
+        if !crate::plugin::is_plugin_installed(config, &plugin_name, &plugin_version) {
+            missing.push((plugin_name, plugin_version));
+            continue;
+        }
+        crate::plugin::activate_plugin_version_root(config, &plugin_name, &plugin_version)?;
+    }
+    Ok(missing)
+}
 
 /// Install Frame CLI
 pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> Result<()> {
@@ -90,6 +149,24 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             config.save()?;
             let _ = update_frame_symlink(&config, &frame_version);
             println!("  Activated Frame version {frame_version}");
+        }
+
+        // The contract is: "after this command returns 0, every per-plugin
+        // pin matches the meta-bundle". Just having `version_dir` on disk
+        // is not enough — per-plugin `.active-version` markers may have
+        // drifted (e.g. via `cleen plugin use`). Re-assert every pin
+        // recorded in this meta-bundle's manifest. Older installs predate
+        // the manifest and the call is a no-op for them.
+        let missing = reactivate_frame_plugins(&config, &frame_version)?;
+        if !missing.is_empty() {
+            eprintln!();
+            eprintln!("⚠️  Frame {frame_version} expects plugin versions that are not installed:");
+            for (name, version) in &missing {
+                eprintln!("   • {name} v{version}");
+            }
+            eprintln!();
+            eprintln!("   Run `cleen frame install {frame_version}` to reinstall, or");
+            eprintln!("   `cleen plugin install <name>@<version>` to fix individually.");
         }
 
         return Ok(());
@@ -189,6 +266,11 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         // and move files into versioned subdirectories
         let mut config = Config::load()?;
         let mut installed_plugin_names: Vec<String> = Vec::new();
+        // Plugin name -> version that actually landed. Written to the frame
+        // version dir as `plugins.json` after the loop so `use`, `uninstall`,
+        // and the install re-entry path can re-assert per-plugin pins
+        // without needing to re-extract the tarball.
+        let mut installed_plugin_versions: BTreeMap<String, String> = BTreeMap::new();
         let mut incompatible_plugins: Vec<(String, String, String, String)> = Vec::new();
         // Plugin name -> reason it failed to install. Used to keep the
         // overall install alive when an individual plugin hits an
@@ -317,9 +399,12 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             match install_one() {
                 Ok(()) => {
                     installed_plugin_names.push(plugin_name.clone());
-                    config
-                        .active_plugins
+                    installed_plugin_versions
                         .insert(plugin_name.clone(), plugin_version.clone());
+                    // `activate_plugin_version_root` inside `install_one`
+                    // already wrote `<name>/.active-version` — the single
+                    // source of truth (see HOST_BRIDGE.md "Plugin Pin
+                    // Resolution"). No config bookkeeping needed.
                     println!("  Installed {plugin_name} v{plugin_version}");
                 }
                 Err(e) => {
@@ -338,7 +423,8 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 if let Err(e) = std::fs::remove_dir_all(&old_path) {
                     eprintln!("Warning: Could not remove stale plugin {old_name}: {e}");
                 } else {
-                    config.active_plugins.remove(*old_name);
+                    // Removing the old plugin dir takes its `.active-version`
+                    // with it — that's the only pin record.
                     println!("  Removed stale plugin: {old_name} (renamed to {new_name})");
                 }
             }
@@ -365,6 +451,11 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                 installed_marker.display()
             ),
         })?;
+
+        // Record which plugin versions ship with this meta-bundle so
+        // `cleen frame use`, `cleen frame uninstall`, and the re-entry
+        // path of `cleen frame install` can re-assert per-plugin pins.
+        write_frame_plugins_manifest(&version_dir, &installed_plugin_versions)?;
 
         // Plugin files were copied (not atomically replaced) into per-plugin
         // version dirs and the activation root. Strip macOS provenance so the
@@ -472,6 +563,17 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         println!();
     }
 
+    // Hint, never prompt: the user opted out of a destructive cleanup by
+    // not running `cleen cleanup --plugins` themselves, so just surface
+    // the headroom and let them decide.
+    if let Some((count, bytes)) = crate::commands::cleanup::plugin_cleanup_summary(&config) {
+        println!(
+            "💡 {count} inactive plugin version(s) using {} — run `cleen cleanup --plugins` to free space.",
+            crate::commands::cleanup::format_size(bytes)
+        );
+        println!();
+    }
+
     Ok(())
 }
 
@@ -532,7 +634,25 @@ pub fn use_frame_version(version: &str) -> Result<()> {
     // Update symlink
     update_frame_symlink(&config, version)?;
 
+    // Re-assert every per-plugin `.active-version` recorded in this
+    // meta-bundle's manifest so the runtime plugin set matches the frame
+    // version that was just selected. Missing per-plugin versions are
+    // surfaced but do not abort — the user needs to know the bundle is
+    // incomplete rather than have `cleen frame use` fail mysteriously.
+    let missing = reactivate_frame_plugins(&config, version)?;
+
     println!("✅ Switched to Frame CLI version {version}");
+
+    if !missing.is_empty() {
+        eprintln!();
+        eprintln!("⚠️  Frame {version} expects plugin versions that are not installed:");
+        for (name, plugin_version) in &missing {
+            eprintln!("   • {name} v{plugin_version}");
+        }
+        eprintln!();
+        eprintln!("   Re-run `cleen frame install {version}` to restore them, or");
+        eprintln!("   install individual plugins with `cleen plugin install <name>@<version>`.");
+    }
 
     Ok(())
 }
@@ -549,6 +669,12 @@ pub fn uninstall_frame_version(version: &str) -> Result<()> {
         });
     }
 
+    // Read the bundle's plugin manifest BEFORE we delete the version dir,
+    // so we know which per-plugin pins were owned by this meta-bundle and
+    // can re-point them to a still-installed version (or drop the marker
+    // so the compiler falls back to highest-installed-semver).
+    let owned_plugin_versions = read_frame_plugins_manifest(&version_dir);
+
     // Check if this is the active version
     if config.frame_version.as_deref() == Some(version) {
         println!("⚠️  This is the currently active Frame CLI version.");
@@ -559,6 +685,44 @@ pub fn uninstall_frame_version(version: &str) -> Result<()> {
         // Remove symlink (handles broken links too)
         let shim_path = config.get_frame_shim_path();
         crate::utils::fs::remove_path_if_exists(&shim_path)?;
+    }
+
+    // Repoint per-plugin pins owned by the bundle being removed.
+    for (plugin_name, bundle_version) in &owned_plugin_versions {
+        let Some(current_pin) =
+            crate::core::config::read_active_version(&config, plugin_name)
+        else {
+            continue;
+        };
+        if current_pin != *bundle_version {
+            continue;
+        }
+        // The active pin belongs to the bundle going away. Try to re-pin
+        // to the highest installed version with `plugin.wasm`, else drop
+        // the marker so the compiler falls through to its semver-max
+        // fallback (see HOST_BRIDGE.md "Plugin Pin Resolution").
+        let candidates = crate::plugin::get_plugin_versions(&config, plugin_name)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|v| v != bundle_version)
+            .filter(|v| {
+                config
+                    .get_plugin_wasm_path(plugin_name, v)
+                    .exists()
+            })
+            .collect::<Vec<_>>();
+        if let Some(latest) = candidates.first() {
+            if let Err(e) =
+                crate::plugin::activate_plugin_version_root(&config, plugin_name, latest)
+            {
+                eprintln!(
+                    "⚠️  Could not re-pin {plugin_name} to {latest} after removing {version}: {e}"
+                );
+            }
+        } else {
+            let marker = config.get_plugin_dir(plugin_name).join(".active-version");
+            let _ = crate::utils::fs::remove_path_if_exists(&marker);
+        }
     }
 
     // Remove version directory

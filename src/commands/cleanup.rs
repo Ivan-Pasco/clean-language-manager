@@ -1,6 +1,7 @@
-use crate::core::config::Config;
+use crate::core::config::{read_active_version, Config};
 use crate::error::Result;
 use std::fs;
+use std::path::PathBuf;
 
 /// Information about a version that can be cleaned up
 #[derive(Debug)]
@@ -116,8 +117,88 @@ fn check_frame_dependency(config: &Config, version: &str) -> bool {
     config.active_version.as_ref() == Some(&version.to_string())
 }
 
+/// Count and total-size of compiler versions that `cleen cleanup` would
+/// consider removable: every installed version that is neither the active
+/// version nor the one the active Frame CLI depends on. Returns `None`
+/// when nothing is removable so callers can skip the post-install hint
+/// entirely rather than printing a noisy "0 versions to clean" line.
+pub fn compiler_cleanup_summary(config: &Config) -> Option<(usize, u64)> {
+    let candidates = list_cleanup_candidates(config).ok()?;
+    let removable: Vec<_> = candidates
+        .into_iter()
+        .filter(|c| !c.is_active && !c.is_frame_dependency)
+        .collect();
+    if removable.is_empty() {
+        return None;
+    }
+    let total: u64 = removable.iter().map(|c| c.size_bytes).sum();
+    Some((removable.len(), total))
+}
+
+/// Same shape as [`compiler_cleanup_summary`] but for plugin versions.
+/// Honors the single-version safety guard from `cleanup_plugins_execute`:
+/// a plugin with only one version on disk contributes nothing, even if
+/// its pin is stale (see HOST_BRIDGE.md "Plugin Pin Resolution").
+pub fn plugin_cleanup_summary(config: &Config) -> Option<(usize, u64)> {
+    let plugins_dir = config.get_plugins_dir();
+    if !plugins_dir.exists() {
+        return None;
+    }
+
+    let mut count = 0usize;
+    let mut total = 0u64;
+
+    let entries = fs::read_dir(&plugins_dir).ok()?;
+    for plugin_entry in entries.flatten() {
+        let plugin_path = plugin_entry.path();
+        if !plugin_path.is_dir() {
+            continue;
+        }
+
+        let plugin_name = plugin_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let active_version = read_active_version(config, &plugin_name);
+
+        let mut version_dirs: Vec<(String, PathBuf)> = Vec::new();
+        if let Ok(version_entries) = fs::read_dir(&plugin_path) {
+            for version_entry in version_entries.flatten() {
+                let version_path = version_entry.path();
+                if !version_path.is_dir() {
+                    continue;
+                }
+                let version = version_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                version_dirs.push((version, version_path));
+            }
+        }
+
+        // Single (or zero) on-disk version: nothing safe to remove here.
+        if version_dirs.len() <= 1 {
+            continue;
+        }
+
+        for (version, version_path) in &version_dirs {
+            if active_version.as_ref() == Some(version) {
+                continue;
+            }
+            count += 1;
+            total += calculate_dir_size(version_path).unwrap_or(0);
+        }
+    }
+
+    if count == 0 {
+        None
+    } else {
+        Some((count, total))
+    }
+}
+
 /// Format bytes as human-readable size
-fn format_size(bytes: u64) -> String {
+pub fn format_size(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
@@ -321,7 +402,7 @@ pub fn cleanup_plugins_dry_run() -> Result<()> {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        let active_version = config.get_active_plugin_version(&plugin_name);
+        let active_version = read_active_version(&config, &plugin_name);
 
         let mut versions: Vec<(String, u64)> = Vec::new();
 
@@ -347,7 +428,7 @@ pub fn cleanup_plugins_dry_run() -> Result<()> {
             println!("  {}:", plugin_name);
 
             for (version, size) in &versions {
-                let is_active = active_version == Some(version);
+                let is_active = active_version.as_ref() == Some(version);
                 if is_active {
                     println!("    {} ({}) - active, keeping", version, format_size(*size));
                 } else {
@@ -373,6 +454,13 @@ pub fn cleanup_plugins_dry_run() -> Result<()> {
 /// Clean up inactive plugin versions
 pub fn cleanup_plugins_execute() -> Result<()> {
     let config = Config::load()?;
+    cleanup_plugins_with_config(&config)
+}
+
+/// Same as `cleanup_plugins_execute`, but accepts an explicit config so
+/// integration tests can drive the safety-guard logic against a temp
+/// `~/.cleen` layout without touching the user's real directory.
+pub fn cleanup_plugins_with_config(config: &Config) -> Result<()> {
     let plugins_dir = config.get_plugins_dir();
 
     if !plugins_dir.exists() {
@@ -399,8 +487,15 @@ pub fn cleanup_plugins_execute() -> Result<()> {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        let active_version = config.get_active_plugin_version(&plugin_name).cloned();
+        let active_version = read_active_version(config, &plugin_name);
 
+        // Collect candidate version directories first so we can refuse to
+        // delete the only on-disk version of a plugin even when the pin is
+        // stale or missing. Without this guard, a ghost `.active-version`
+        // pointing at a non-existent version would mark the lone real
+        // version as removable and the next `cleen cleanup --plugins`
+        // would wipe it.
+        let mut version_dirs: Vec<(String, PathBuf)> = Vec::new();
         for version_entry in fs::read_dir(&plugin_path)? {
             let version_entry = version_entry?;
             let version_path = version_entry.path();
@@ -414,16 +509,25 @@ pub fn cleanup_plugins_execute() -> Result<()> {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
 
+            version_dirs.push((version, version_path));
+        }
+
+        if version_dirs.len() <= 1 {
+            // Single (or zero) on-disk version: nothing safe to remove here.
+            continue;
+        }
+
+        for (version, version_path) in &version_dirs {
             // Skip active version
-            if active_version.as_ref() == Some(&version) {
+            if active_version.as_ref() == Some(version) {
                 continue;
             }
 
-            let size = calculate_dir_size(&version_path).unwrap_or(0);
+            let size = calculate_dir_size(version_path).unwrap_or(0);
 
             print!("  Removing {}/{}... ", plugin_name, version);
 
-            match fs::remove_dir_all(&version_path) {
+            match fs::remove_dir_all(version_path) {
                 Ok(()) => {
                     println!("done ({})", format_size(size));
                     removed_count += 1;

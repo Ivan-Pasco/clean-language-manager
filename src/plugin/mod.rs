@@ -110,7 +110,7 @@ pub fn is_plugin_installed(config: &Config, name: &str, version: &str) -> bool {
 }
 
 /// Remove a plugin (all versions)
-pub fn remove_plugin(config: &mut Config, name: &str) -> Result<()> {
+pub fn remove_plugin(config: &Config, name: &str) -> Result<()> {
     let plugin_dir = config.get_plugin_dir(name);
 
     if !plugin_dir.exists() {
@@ -119,18 +119,17 @@ pub fn remove_plugin(config: &mut Config, name: &str) -> Result<()> {
         });
     }
 
-    // Remove the plugin directory
+    // Removing the plugin dir takes `.active-version` with it — no further
+    // bookkeeping needed since `.active-version` is the single source of
+    // truth for plugin pins (see HOST_BRIDGE.md "Plugin Pin Resolution").
     fs::remove_dir_all(&plugin_dir)?;
-
-    // Remove from active plugins
-    config.remove_active_plugin(name)?;
 
     Ok(())
 }
 
 /// Remove a specific version of a plugin
 #[allow(dead_code)]
-pub fn remove_plugin_version(config: &mut Config, name: &str, version: &str) -> Result<()> {
+pub fn remove_plugin_version(config: &Config, name: &str, version: &str) -> Result<()> {
     let version_dir = config.get_plugin_version_dir(name, version);
 
     if !version_dir.exists() {
@@ -140,18 +139,21 @@ pub fn remove_plugin_version(config: &mut Config, name: &str, version: &str) -> 
         });
     }
 
-    // Remove the version directory
+    let was_active =
+        crate::core::config::read_active_version(config, name).as_deref() == Some(version);
+
     fs::remove_dir_all(&version_dir)?;
 
-    // If this was the active version, handle root-level cleanup
-    if config.get_active_plugin_version(name) == Some(&version.to_string()) {
-        config.remove_active_plugin(name)?;
+    // If this was the active version, repoint or remove the marker.
+    if was_active {
+        let plugin_dir = config.get_plugin_dir(name);
+        let marker = plugin_dir.join(".active-version");
+        let _ = crate::utils::fs::remove_path_if_exists(&marker);
         clean_plugin_root_files(config, name)?;
 
-        // If another version exists, activate it automatically
+        // If another version exists, activate it automatically.
         let remaining_versions = get_plugin_versions(config, name)?;
         if let Some(latest) = remaining_versions.first() {
-            config.set_active_plugin(name, latest)?;
             activate_plugin_version_root(config, name, latest)?;
         }
     }
@@ -176,6 +178,18 @@ pub fn activate_plugin_version_root(config: &Config, name: &str, version: &str) 
     let plugin_dir = config.get_plugin_dir(name);
 
     if !version_dir.exists() {
+        return Err(CleenError::PluginVersionNotFound {
+            name: name.to_string(),
+            version: version.to_string(),
+        });
+    }
+
+    // Guard against ghost pins: refuse to write `.active-version` for a
+    // version whose `plugin.wasm` is missing on disk. Without this, callers
+    // could leave the marker pointing at a non-existent runtime; the
+    // compiler would warn-and-fall-back, and `cleen plugin list` would
+    // mis-report "active". See HOST_BRIDGE.md "Plugin Pin Resolution".
+    if !version_dir.join("plugin.wasm").exists() {
         return Err(CleenError::PluginVersionNotFound {
             name: name.to_string(),
             version: version.to_string(),

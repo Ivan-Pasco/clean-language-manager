@@ -198,8 +198,18 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
     println!("To use this version, run:");
     println!("   cleen use {clean_version}");
 
-    // Offer Frame CLI installation
+    // Reload after install so the new version is counted as active when
+    // computing the cleanup hint below.
     let config = Config::load()?;
+    if let Some((count, bytes)) = crate::commands::cleanup::compiler_cleanup_summary(&config) {
+        println!();
+        println!(
+            "💡 {count} inactive compiler version(s) using {} — run `cleen cleanup` to free space.",
+            crate::commands::cleanup::format_size(bytes)
+        );
+    }
+
+    // Offer Frame CLI installation
     if !no_frame && config.auto_offer_frame {
         let should_install_frame = if with_frame {
             true
