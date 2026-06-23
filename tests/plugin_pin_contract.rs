@@ -10,9 +10,7 @@
 //!   - A legacy `config.json` carrying the removed `active_plugins` map still
 //!     deserializes and is saved without that field.
 
-use cleen::commands::cleanup::{
-    cleanup_plugins_with_config, plugin_cleanup_summary,
-};
+use cleen::commands::cleanup::{cleanup_plugins_with_config, plugin_cleanup_summary};
 use cleen::core::config::{read_active_version, Config};
 use cleen::plugin::activate_plugin_version_root;
 use std::fs;
@@ -143,7 +141,10 @@ fn activate_plugin_refuses_to_pin_missing_wasm() {
     install_plugin_version_without_wasm(&plugins_dir, "frame.client", "1.2.3");
 
     let err = activate_plugin_version_root(&cfg, "frame.client", "1.2.3");
-    assert!(err.is_err(), "expected ghost-pin guard to reject activation");
+    assert!(
+        err.is_err(),
+        "expected ghost-pin guard to reject activation"
+    );
 
     // No marker should have been written, leaving the lookup at None.
     assert_eq!(read_active_version(&cfg, "frame.client"), None);

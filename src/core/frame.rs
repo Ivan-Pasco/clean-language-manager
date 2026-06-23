@@ -53,10 +53,7 @@ fn read_frame_plugins_manifest(version_dir: &Path) -> BTreeMap<String, String> {
 /// meta-bundle's manifest. Returns the list of `(plugin, version)` entries
 /// the manifest expected but which are not present on disk so callers can
 /// surface a single combined error rather than aborting on the first miss.
-fn reactivate_frame_plugins(
-    config: &Config,
-    frame_version: &str,
-) -> Result<Vec<(String, String)>> {
+fn reactivate_frame_plugins(config: &Config, frame_version: &str) -> Result<Vec<(String, String)>> {
     let version_dir = get_frame_version_dir(config, frame_version);
     let manifest = read_frame_plugins_manifest(&version_dir);
     let mut missing = Vec::new();
@@ -399,8 +396,7 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
             match install_one() {
                 Ok(()) => {
                     installed_plugin_names.push(plugin_name.clone());
-                    installed_plugin_versions
-                        .insert(plugin_name.clone(), plugin_version.clone());
+                    installed_plugin_versions.insert(plugin_name.clone(), plugin_version.clone());
                     // `activate_plugin_version_root` inside `install_one`
                     // already wrote `<name>/.active-version` — the single
                     // source of truth (see HOST_BRIDGE.md "Plugin Pin
@@ -689,8 +685,7 @@ pub fn uninstall_frame_version(version: &str) -> Result<()> {
 
     // Repoint per-plugin pins owned by the bundle being removed.
     for (plugin_name, bundle_version) in &owned_plugin_versions {
-        let Some(current_pin) =
-            crate::core::config::read_active_version(&config, plugin_name)
+        let Some(current_pin) = crate::core::config::read_active_version(&config, plugin_name)
         else {
             continue;
         };
@@ -705,11 +700,7 @@ pub fn uninstall_frame_version(version: &str) -> Result<()> {
             .unwrap_or_default()
             .into_iter()
             .filter(|v| v != bundle_version)
-            .filter(|v| {
-                config
-                    .get_plugin_wasm_path(plugin_name, v)
-                    .exists()
-            })
+            .filter(|v| config.get_plugin_wasm_path(plugin_name, v).exists())
             .collect::<Vec<_>>();
         if let Some(latest) = candidates.first() {
             if let Err(e) =
