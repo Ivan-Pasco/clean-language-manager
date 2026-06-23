@@ -275,6 +275,36 @@ pub fn check_environment(check_frame: bool) -> Result<()> {
         println!();
     }
 
+    // Graveyard hygiene check. The eviction helpers in utils/fs.rs leave
+    // `*.locked-*` graveyard dirs behind under ~/.cleen/plugins/ every
+    // time provenance-locked files are renamed out of the way during an
+    // install. Each install can leave one root-level graveyard per
+    // plugin and one version-level graveyard per plugin version, so the
+    // count climbs fast on macOS Sequoia hosts that pick up
+    // com.apple.provenance on downloaded files. Surface counts above 10
+    // as an action item — the prune helper at end-of-install handles
+    // fresh runs, but hosts that upgraded to the auto-prune build with
+    // accumulated history still need the explicit cleanup.
+    let (gy_count, gy_bytes) = crate::commands::cleanup::graveyard_summary(&config);
+    println!();
+    println!("🗑️  Eviction Graveyards:");
+    if gy_count == 0 {
+        println!("  ✅ none");
+    } else if gy_count <= 10 {
+        println!(
+            "  ✅ {gy_count} found ({}) — within healthy range",
+            crate::commands::cleanup::format_size(gy_bytes)
+        );
+    } else {
+        println!(
+            "  ⚠️  {gy_count} found ({})",
+            crate::commands::cleanup::format_size(gy_bytes)
+        );
+        println!("     Run 'cleen cleanup --graveyards --confirm' to free space.");
+        issues_found += 1;
+    }
+    println!();
+
     // Summary
     if issues_found == 0 {
         println!("🎉 Environment looks good! No issues found.");

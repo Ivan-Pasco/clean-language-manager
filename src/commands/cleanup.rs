@@ -197,6 +197,113 @@ pub fn plugin_cleanup_summary(config: &Config) -> Option<(usize, u64)> {
     }
 }
 
+/// Count eviction graveyards under `~/.cleen/plugins/` and inside each
+/// per-plugin directory. Returns `(count, bytes)`. Used by both the
+/// dry-run preview and the `cleen doctor` warning.
+pub fn graveyard_summary(config: &Config) -> (usize, u64) {
+    let plugins_dir = config.get_plugins_dir();
+    if !plugins_dir.exists() {
+        return (0, 0);
+    }
+
+    let mut count = 0usize;
+    let mut bytes = 0u64;
+
+    // Root-level graveyards from `evict_locked_plugin_root`.
+    count += crate::utils::fs::count_graveyards(&plugins_dir);
+
+    // Per-plugin version graveyards from `evict_locked_dir`. We have to
+    // measure them here because `count_graveyards` only counts entries,
+    // not sizes; the bytes total is what makes the doctor warning
+    // actionable.
+    if let Ok(entries) = fs::read_dir(&plugins_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry
+                .file_name()
+                .to_str()
+                .map(str::to_owned)
+                .unwrap_or_default();
+            if !path.is_dir() {
+                continue;
+            }
+            if name.contains(".locked-") {
+                // Root-level graveyard — already counted above; just add bytes.
+                bytes += calculate_dir_size(&path).unwrap_or(0);
+                continue;
+            }
+            // Walk version graveyards inside this plugin dir.
+            if let Ok(sub_entries) = fs::read_dir(&path) {
+                for sub in sub_entries.flatten() {
+                    let sub_name = sub
+                        .file_name()
+                        .to_str()
+                        .map(str::to_owned)
+                        .unwrap_or_default();
+                    if sub_name.contains(".locked-") {
+                        count += 1;
+                        bytes += calculate_dir_size(&sub.path()).unwrap_or(0);
+                    }
+                }
+            }
+        }
+    }
+
+    (count, bytes)
+}
+
+/// Show what `cleen cleanup --graveyards --confirm` would remove.
+pub fn cleanup_graveyards_dry_run() -> Result<()> {
+    let config = Config::load()?;
+    let (count, bytes) = graveyard_summary(&config);
+    if count == 0 {
+        println!("No eviction graveyards to prune.");
+        return Ok(());
+    }
+    println!(
+        "Would prune {count} eviction graveyard(s) ({}).",
+        format_size(bytes)
+    );
+    println!();
+    println!("Run 'cleen cleanup --graveyards --confirm' to remove them.");
+    Ok(())
+}
+
+/// Remove every `*.locked-*` graveyard under `~/.cleen/plugins/` and
+/// each per-plugin dir. Safe after activation (see [`prune_graveyards`]).
+pub fn cleanup_graveyards_execute() -> Result<()> {
+    let config = Config::load()?;
+    let plugins_dir = config.get_plugins_dir();
+    if !plugins_dir.exists() {
+        println!("No plugins installed.");
+        return Ok(());
+    }
+
+    let (mut count, mut bytes) = crate::utils::fs::prune_graveyards(&plugins_dir);
+
+    if let Ok(entries) = fs::read_dir(&plugins_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let (c, b) = crate::utils::fs::prune_graveyards(&path);
+            count += c;
+            bytes += b;
+        }
+    }
+
+    if count == 0 {
+        println!("No eviction graveyards to prune.");
+    } else {
+        println!(
+            "Pruned {count} eviction graveyard(s), freed {}.",
+            format_size(bytes)
+        );
+    }
+    Ok(())
+}
+
 /// Format bytes as human-readable size
 pub fn format_size(bytes: u64) -> String {
     const KB: u64 = 1024;

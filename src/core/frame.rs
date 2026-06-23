@@ -458,6 +458,31 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         // next `cleen frame install` can overwrite plugin.wasm in place.
         crate::utils::fs::strip_macos_xattrs_recursive(&plugins_dir);
 
+        // Activation succeeded for every plugin that's listed in
+        // installed_plugin_names. The eviction graveyards left behind by
+        // `evict_locked_plugin_root` (at the plugins-dir level) and
+        // `evict_locked_dir` (inside each per-plugin dir) have served
+        // their purpose — the kernel pin travelled with the rename and
+        // the new entries were populated from the staging dir, not from
+        // the graveyards. Prune them now so they don't accumulate run
+        // after run.
+        let mut total_pruned = 0usize;
+        let mut total_freed = 0u64;
+        let (root_count, root_bytes) = crate::utils::fs::prune_graveyards(&plugins_dir);
+        total_pruned += root_count;
+        total_freed += root_bytes;
+        for plugin_name in &installed_plugin_names {
+            let (c, b) = crate::utils::fs::prune_graveyards(&plugins_dir.join(plugin_name));
+            total_pruned += c;
+            total_freed += b;
+        }
+        if total_pruned > 0 {
+            println!(
+                "  Pruned {total_pruned} eviction graveyard(s), freed {}",
+                crate::commands::cleanup::format_size(total_freed)
+            );
+        }
+
         // Clean up temporary files
         std::fs::remove_dir_all(&temp_dir)?;
 

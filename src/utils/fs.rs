@@ -678,6 +678,98 @@ pub fn evict_locked_shims(bin_dir: &Path, names: &[&str]) -> Result<bool> {
     }
 }
 
+/// Test if a directory entry name matches the eviction-graveyard pattern
+/// produced by [`evict_locked_dir`] and [`evict_locked_plugin_root`]:
+/// `<original_name>.locked-<nanos>-<pid>` (or the older
+/// `<original_name>.locked-<seconds>` shape from the very first releases).
+/// Both shapes share the `.locked-` infix.
+fn is_graveyard_name(name: &str) -> bool {
+    name.contains(".locked-")
+}
+
+/// Sum the byte size of every file under `path`, following the tree
+/// recursively. Returns `0` on permission errors and broken symlinks
+/// rather than aborting — this is used for cleanup accounting, not for
+/// data correctness.
+fn dir_size_bytes(path: &Path) -> u64 {
+    let mut total = 0u64;
+    let entries = match std::fs::read_dir(path) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if meta.is_file() {
+            total += meta.len();
+        } else if meta.is_dir() {
+            total += dir_size_bytes(&entry.path());
+        }
+    }
+    total
+}
+
+/// Count eviction graveyards directly under `parent` without removing
+/// them. Used by `cleen doctor` to surface accumulation early.
+pub fn count_graveyards(parent: &Path) -> usize {
+    let entries = match std::fs::read_dir(parent) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    entries
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .map(is_graveyard_name)
+                .unwrap_or(false)
+        })
+        .count()
+}
+
+/// Remove every eviction graveyard (`*.locked-*`) directly under `parent`.
+/// Returns `(count_removed, bytes_freed)`.
+///
+/// Safe to call after activation succeeds: the graveyard's only purpose
+/// is to take the kernel's provenance pin so that the original directory
+/// entry can be recreated cleanly. Once the new entry is populated from
+/// the staging dir (not from the graveyard), the graveyard is dead
+/// weight. The eviction helpers themselves explicitly do not delete the
+/// graveyard so users can inspect what was preserved — this helper is
+/// the deferred cleanup pass.
+pub fn prune_graveyards(parent: &Path) -> (usize, u64) {
+    let mut removed = 0usize;
+    let mut freed = 0u64;
+    let entries = match std::fs::read_dir(parent) {
+        Ok(e) => e,
+        Err(_) => return (0, 0),
+    };
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        if !is_graveyard_name(&name) {
+            continue;
+        }
+        let path = entry.path();
+        let size = dir_size_bytes(&path);
+        match std::fs::remove_dir_all(&path) {
+            Ok(()) => {
+                removed += 1;
+                freed += size;
+            }
+            Err(e) => {
+                eprintln!(
+                    "  warning: could not prune graveyard {}: {e}",
+                    path.display()
+                );
+            }
+        }
+    }
+    (removed, freed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

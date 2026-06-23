@@ -83,6 +83,9 @@ enum Commands {
         /// Clean up plugins instead of compiler versions
         #[clap(long)]
         plugins: bool,
+        /// Prune `*.locked-*` eviction graveyards under ~/.cleen/plugins/
+        #[clap(long)]
+        graveyards: bool,
     },
     /// Frame CLI management
     Frame {
@@ -296,8 +299,15 @@ fn main() -> Result<()> {
             confirm,
             keep,
             plugins,
+            graveyards,
         } => {
-            if plugins {
+            if graveyards {
+                if confirm {
+                    commands::cleanup::cleanup_graveyards_execute().map_err(|e| anyhow::anyhow!(e))
+                } else {
+                    commands::cleanup::cleanup_graveyards_dry_run().map_err(|e| anyhow::anyhow!(e))
+                }
+            } else if plugins {
                 if confirm {
                     commands::cleanup::cleanup_plugins_execute().map_err(|e| anyhow::anyhow!(e))
                 } else {
