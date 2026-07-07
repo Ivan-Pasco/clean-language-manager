@@ -71,33 +71,29 @@ fn reactivate_frame_plugins(config: &Config, frame_version: &str) -> Result<Vec<
 pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> Result<()> {
     let config = Config::load()?;
 
-    // Fetch releases from GitHub early (needed to resolve "latest")
     let github_client = GitHubClient::new(config.github_api_token.clone());
-    println!("Fetching Frame releases...");
 
-    let releases = match github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
-        Ok(releases) => releases,
-        Err(e) => {
-            println!("Unable to fetch releases from GitHub: {e}");
-            println!(
-                "   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases"
-            );
-            return Ok(());
-        }
-    };
-
-    if releases.is_empty() {
-        println!("No releases found in the repository.");
-        println!("   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases");
-        return Ok(());
-    }
-
-    // Determine version to install (resolve "latest" from fetched releases)
+    // Determine version to install. Resolve "latest" via /releases/latest
+    // rather than /releases[0] — the paginated list endpoint returns
+    // `{"message": "..."}` on rate-limit and gets deserialized as
+    // `invalid type: map, expected a sequence`. See CLEEN-FRAME-INSTALL-BROKEN.
     let frame_version = if let Some(v) = version {
         if v.eq_ignore_ascii_case("latest") {
-            let latest = releases[0].tag_name.trim_start_matches('v').to_string();
-            println!("Resolved latest version: {latest}");
-            latest
+            println!("Fetching latest Frame release...");
+            match github_client.get_latest_release(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
+                Ok(release) => {
+                    let latest = release.tag_name.trim_start_matches('v').to_string();
+                    println!("Resolved latest version: {latest}");
+                    latest
+                }
+                Err(e) => {
+                    println!("Unable to fetch latest Frame release from GitHub: {e}");
+                    println!(
+                        "   Repository: https://github.com/{FRAME_REPO_OWNER}/{FRAME_REPO_NAME}/releases"
+                    );
+                    return Ok(());
+                }
+            }
         } else {
             v.trim_start_matches('v').to_string()
         }
@@ -181,20 +177,28 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         }
     }
 
-    // Find the specified version release
+    // Find the specified version release. Prefer the targeted
+    // /releases/tags/<tag> endpoint (single Release object, not paginated) so
+    // an explicit pinned version keeps working even when /releases would
+    // require pagination to reach it.
     let tag_name = format!("v{}", frame_version.trim_start_matches('v'));
-    let release = releases
-        .iter()
-        .find(|r| r.tag_name == tag_name)
-        .ok_or_else(|| {
-            println!("Available Frame versions:");
-            for r in &releases {
-                println!("  - {}", r.tag_name.trim_start_matches('v'));
+    let release = match github_client.get_release_by_tag(FRAME_REPO_OWNER, FRAME_REPO_NAME, &tag_name) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Unable to fetch Frame release {tag_name}: {e}");
+            // Only fetch the paginated list to help the user pick a valid
+            // tag — a failure here is informational, not fatal.
+            if let Ok(releases) = github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
+                println!("Available Frame versions (recent):");
+                for r in &releases {
+                    println!("  - {}", r.tag_name.trim_start_matches('v'));
+                }
             }
-            CleenError::FrameVersionNotFound {
+            return Err(CleenError::FrameVersionNotFound {
                 frame_version: frame_version.clone(),
-            }
-        })?;
+            });
+        }
+    };
 
     // Find appropriate asset: try platform-specific binary first, then plugin tarball
     let platform_suffix = get_platform_suffix();

@@ -45,43 +45,43 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
         });
     }
 
-    // Get releases and find the specified version
-    println!("Fetching available releases...");
-    let releases = match github_client.get_releases("Ivan-Pasco", "clean-language-compiler") {
-        Ok(releases) => releases,
+    // Fetch the pinned tag directly via /releases/tags/<tag>. This endpoint
+    // returns a single Release object (not paginated) and is not affected by
+    // the "invalid type: map" failure mode when GitHub returns an error
+    // response. See CLEEN-FRAME-INSTALL-BROKEN.
+    println!("Fetching release {github_version}...");
+    let release = match github_client.get_release_by_tag(
+        "Ivan-Pasco",
+        "clean-language-compiler",
+        &github_version,
+    ) {
+        Ok(release) => release,
         Err(e) => {
-            println!("⚠️  Unable to fetch releases from GitHub: {e}");
+            println!("⚠️  Unable to fetch release {github_version} from GitHub: {e}");
             println!("   This may be because:");
-            println!("   • The repository doesn't have releases yet");
+            println!("   • The version does not exist");
             println!("   • Network connectivity issues");
             println!("   • GitHub API rate limiting");
             println!();
+            // Best-effort: show a recent version list to help the user pick
+            // one. A failure here is informational.
+            if let Ok(releases) = github_client.get_releases("Ivan-Pasco", "clean-language-compiler")
+            {
+                if !releases.is_empty() {
+                    println!("Available versions (recent):");
+                    for r in &releases {
+                        println!("  • {}", normalize::to_clean_version(&r.tag_name));
+                    }
+                    println!();
+                }
+            }
             println!("   Please check the repository manually:");
             println!("   https://github.com/Ivan-Pasco/clean-language-compiler/releases");
-            return Ok(());
+            return Err(CleenError::VersionNotFound {
+                version: clean_version.clone(),
+            });
         }
     };
-
-    if releases.is_empty() {
-        println!("⚠️  No releases found in the repository.");
-        println!("   The Clean Language compiler may still be in development.");
-        println!("   Please check back later or follow the repository for updates:");
-        println!("   https://github.com/Ivan-Pasco/clean-language-compiler/releases");
-        return Ok(());
-    }
-
-    let release = releases
-        .iter()
-        .find(|r| r.tag_name == github_version)
-        .ok_or_else(|| {
-            println!("Available versions:");
-            for r in &releases {
-                println!("  • {}", normalize::to_clean_version(&r.tag_name));
-            }
-            CleenError::VersionNotFound {
-                version: clean_version.clone(),
-            }
-        })?;
 
     // Find appropriate asset for current platform
     let platform_suffix = get_platform_suffix();
