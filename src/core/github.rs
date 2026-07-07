@@ -51,13 +51,17 @@ fn parse_github_response<T: serde::de::DeserializeOwned>(
 
     if !is_success {
         if let Ok(err) = serde_json::from_str::<GithubError>(body) {
-            let status = status_code.map(|c| c.to_string()).unwrap_or_else(|| "?".to_string());
+            let status = status_code
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "?".to_string());
             return Err(anyhow::anyhow!(
                 "GitHub API returned HTTP {status}: {}",
                 err.message
             ));
         }
-        let status = status_code.map(|c| c.to_string()).unwrap_or_else(|| "?".to_string());
+        let status = status_code
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "?".to_string());
         let snippet: String = body.chars().take(200).collect();
         return Err(anyhow::anyhow!(
             "GitHub API returned HTTP {status} with unrecognized body: {snippet}"
@@ -141,9 +145,8 @@ impl GitHubClient {
         repo_name: &str,
         tag: &str,
     ) -> Result<Release> {
-        let url = format!(
-            "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{tag}"
-        );
+        let url =
+            format!("https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{tag}");
         let (status, body) = curl_with_status(&url)?;
         parse_github_response::<Release>(status, &body)
     }
@@ -216,8 +219,7 @@ mod tests {
 
     #[test]
     fn parses_valid_release_array() {
-        let releases: Vec<Release> =
-            parse_github_response(Some(200), VALID_RELEASE_ARRAY).unwrap();
+        let releases: Vec<Release> = parse_github_response(Some(200), VALID_RELEASE_ARRAY).unwrap();
         assert_eq!(releases.len(), 1);
         assert_eq!(releases[0].tag_name, "v2.12.127");
     }
@@ -232,7 +234,10 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("HTTP 403"), "got: {msg}");
         assert!(msg.contains("rate limit exceeded"), "got: {msg}");
-        assert!(!msg.contains("invalid type"), "should not leak serde error: {msg}");
+        assert!(
+            !msg.contains("invalid type"),
+            "should not leak serde error: {msg}"
+        );
     }
 
     #[test]
@@ -241,7 +246,10 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("HTTP 403"), "got: {msg}");
         assert!(msg.contains("rate limit exceeded"), "got: {msg}");
-        assert!(!msg.contains("missing field"), "should not leak serde error: {msg}");
+        assert!(
+            !msg.contains("missing field"),
+            "should not leak serde error: {msg}"
+        );
     }
 
     #[test]
@@ -254,8 +262,7 @@ mod tests {
 
     #[test]
     fn unrecognized_body_snippets_out() {
-        let err =
-            parse_github_response::<Release>(Some(500), "internal server error").unwrap_err();
+        let err = parse_github_response::<Release>(Some(500), "internal server error").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("HTTP 500"), "got: {msg}");
         assert!(msg.contains("internal server error"), "got: {msg}");

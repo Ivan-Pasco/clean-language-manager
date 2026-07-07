@@ -65,7 +65,8 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
             println!();
             // Best-effort: show a recent version list to help the user pick
             // one. A failure here is informational.
-            if let Ok(releases) = github_client.get_releases("Ivan-Pasco", "clean-language-compiler")
+            if let Ok(releases) =
+                github_client.get_releases("Ivan-Pasco", "clean-language-compiler")
             {
                 if !releases.is_empty() {
                     println!("Available versions (recent):");

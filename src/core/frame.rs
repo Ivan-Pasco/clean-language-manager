@@ -182,23 +182,25 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
     // an explicit pinned version keeps working even when /releases would
     // require pagination to reach it.
     let tag_name = format!("v{}", frame_version.trim_start_matches('v'));
-    let release = match github_client.get_release_by_tag(FRAME_REPO_OWNER, FRAME_REPO_NAME, &tag_name) {
-        Ok(r) => r,
-        Err(e) => {
-            println!("Unable to fetch Frame release {tag_name}: {e}");
-            // Only fetch the paginated list to help the user pick a valid
-            // tag — a failure here is informational, not fatal.
-            if let Ok(releases) = github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME) {
-                println!("Available Frame versions (recent):");
-                for r in &releases {
-                    println!("  - {}", r.tag_name.trim_start_matches('v'));
+    let release =
+        match github_client.get_release_by_tag(FRAME_REPO_OWNER, FRAME_REPO_NAME, &tag_name) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("Unable to fetch Frame release {tag_name}: {e}");
+                // Only fetch the paginated list to help the user pick a valid
+                // tag — a failure here is informational, not fatal.
+                if let Ok(releases) = github_client.get_releases(FRAME_REPO_OWNER, FRAME_REPO_NAME)
+                {
+                    println!("Available Frame versions (recent):");
+                    for r in &releases {
+                        println!("  - {}", r.tag_name.trim_start_matches('v'));
+                    }
                 }
+                return Err(CleenError::FrameVersionNotFound {
+                    frame_version: frame_version.clone(),
+                });
             }
-            return Err(CleenError::FrameVersionNotFound {
-                frame_version: frame_version.clone(),
-            });
-        }
-    };
+        };
 
     // Find appropriate asset: try platform-specific binary first, then plugin tarball
     let platform_suffix = get_platform_suffix();
