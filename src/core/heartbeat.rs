@@ -305,7 +305,11 @@ fn git_repo_root() -> Option<String> {
         return None;
     }
     let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() { None } else { Some(s) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 fn git_remote_url() -> String {
@@ -500,7 +504,9 @@ mod tests {
         match project_hash() {
             Some(h) => {
                 assert_eq!(h.len(), 64);
-                assert!(h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+                assert!(h
+                    .chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
             }
             None => {}
         }

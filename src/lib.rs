@@ -69,7 +69,9 @@ pub fn install(spec: VersionSpec<'_>) -> Result<InstalledVersion, CleenError> {
     }
 
     // Delegate to the existing CLI-shared installer with prompts suppressed.
-    commands::install::install_version(spec, /* with_frame */ false, /* no_frame */ true)?;
+    commands::install::install_version(
+        spec, /* with_frame */ false, /* no_frame */ true,
+    )?;
 
     // Reload config and resolve the installed binary. `install_version`
     // resolves "latest" internally against GitHub, so re-derive from what's
