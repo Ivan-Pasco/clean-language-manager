@@ -8,9 +8,10 @@
 //!
 //! Privacy:
 //! - No source code, file paths, or user identity in the body.
-//! - `project_hash` is a one-way SHA-256 of `git_remote_origin_url + "|"
-//!   + git rev-parse --show-toplevel`. Identical across compiler /
-//!   framework / cleen so their reports and heartbeats match.
+//! - `project_hash` is a one-way SHA-256 built from the `git remote
+//!   get-url origin` output, a `|` separator, and `git rev-parse
+//!   --show-toplevel`. Identical across compiler / framework / cleen so
+//!   their reports and heartbeats match.
 //! - Outside a git working tree, no heartbeat is sent — the contract
 //!   forbids computing `project_hash` there.
 //! - Set `CLEEN_HEARTBEAT=off` to disable entirely.
@@ -501,14 +502,11 @@ mod tests {
         // Runs both in a git repo (returns Some) and outside one
         // (returns None). Whichever we hit, the invariants below must
         // hold.
-        match project_hash() {
-            Some(h) => {
-                assert_eq!(h.len(), 64);
-                assert!(h
-                    .chars()
-                    .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
-            }
-            None => {}
+        if let Some(h) = project_hash() {
+            assert_eq!(h.len(), 64);
+            assert!(h
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
         }
     }
 
