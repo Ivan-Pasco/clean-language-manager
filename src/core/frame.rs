@@ -408,6 +408,9 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
                     // source of truth (see HOST_BRIDGE.md "Plugin Pin
                     // Resolution"). No config bookkeeping needed.
                     println!("  Installed {plugin_name} v{plugin_version}");
+                    // Aggregate heartbeat fires once after the full
+                    // install loop completes — see the send_install()
+                    // call after write_frame_plugins_manifest below.
                 }
                 Err(e) => {
                     eprintln!("  Failed to install {plugin_name} v{plugin_version}: {e}");
@@ -499,6 +502,14 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
         println!("Successfully installed Frame plugins version {frame_version}");
         println!("   Plugins location: {}", plugins_dir.display());
 
+        // One aggregate heartbeat describing the whole active toolchain
+        // (compiler + every pinned plugin). Server matches
+        // installed.compiler + installed.plugins against fix_released
+        // bugs for this project_hash and returns advanced_bugs; the
+        // helper prints one line per bug that just moved to
+        // fix_installed for this user.
+        crate::core::heartbeat::send_install();
+
         if !failed_plugins.is_empty() {
             eprintln!();
             eprintln!("⚠️  Plugins that failed to install (other plugins succeeded):");
@@ -574,6 +585,8 @@ pub fn install_frame(version: Option<&str>, skip_compatibility_check: bool) -> R
 
         println!("Successfully installed Frame version {frame_version}");
         println!("   Binary location: {binary_path:?}");
+
+        crate::core::heartbeat::send_install();
     }
 
     println!();

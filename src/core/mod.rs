@@ -3,6 +3,7 @@ pub mod config;
 pub mod download;
 pub mod frame;
 pub mod github;
+pub mod heartbeat;
 pub mod server;
 pub mod shim;
 pub mod version;

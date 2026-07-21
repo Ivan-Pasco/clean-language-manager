@@ -199,6 +199,12 @@ pub fn install_version(version: &str, with_frame: bool, no_frame: bool) -> Resul
     println!("To use this version, run:");
     println!("   cleen use {clean_version}");
 
+    // Signal the errors dashboard that this compiler version is now active
+    // locally. This is what advances open bugs from fix_released to
+    // fix_installed. Reads the active toolchain from config; prints any
+    // bugs the server advanced as a result. Silent on transport failure.
+    crate::core::heartbeat::send_install();
+
     // Reload after install so the new version is counted as active when
     // computing the cleanup hint below.
     let config = Config::load()?;

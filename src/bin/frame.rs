@@ -80,6 +80,9 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // See main cleen binary for rationale.
+    cleen::core::heartbeat::maybe_send_weekly();
+
     let result = match cli.command {
         Commands::New {
             name,

@@ -263,6 +263,12 @@ enum ServerCommands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // Best-effort weekly heartbeat so the errors dashboard can advance bugs
+    // from fix_released → fix_installed for long-running projects that
+    // haven't run `cleen install` recently. Silent on failure; gated by
+    // CLEEN_HEARTBEAT env var. See core::heartbeat.
+    core::heartbeat::maybe_send_weekly();
+
     let result = match cli.command {
         Commands::Install {
             version,
